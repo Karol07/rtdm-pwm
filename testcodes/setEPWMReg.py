@@ -30,22 +30,18 @@ def _getReg(address):
 def _setReg(address, new_value):
 	""" Sets 32 bits at given address to given value. """
 	mem[address:address+4] = struct.pack("<L", new_value)
-
 def _pwm_chpen(address, mask):
 	""" Sets PWM-chopping enabling. """
 	_andReg(address,0xfffe)
 	_orReg(address,mask)
-
 def _pwm_oshtwth(address, mask):
 	""" Sets one-shot purse width. """
 	_andReg(address,0xffe1)
 	_orReg(address,mask << 1)
-
 def _pwm_chfreq(address, mask):
 	""" Sets clock frequency. """
 	_andReg(address,0xff1f)
 	_orReg(address,mask << 5)
-
 def _pwm_chduty(address, mask):
 	""" Sets clock duty cycle. """
 	_andReg(address,0xf8ff)
