@@ -32,37 +32,53 @@ def _setReg(address, new_value):
 	mem[address:address+4] = struct.pack("<L", new_value)
 
 def _pwm_chpen(address, mask):
-	_andReg(address,0x0)
+	""" Sets PWM-chopping enabling. """
+	_andReg(address,0xfffe)
 	_orReg(address,mask)
 
 def _pwm_oshtwth(address, mask):
-	_andReg(address,0x0000 << 1)
+	""" Sets one-shot purse width. """
+	_andReg(address,0xffe1)
 	_orReg(address,mask << 1)
 
-def _pwm_freq(address, mask):
-	_andReg(address,0x000 << 5)
+def _pwm_chfreq(address, mask):
+	""" Sets clock frequency. """
+	_andReg(address,0xff1f)
 	_orReg(address,mask << 5)
 
-def _pwm_duty(address, mask):
-	_andReg(address,0x000 << 8)
+def _pwm_chduty(address, mask):
+	""" Sets clock duty cycle. """
+	_andReg(address,0xf8ff)
 	_orReg(address,mask << 8)
 
 if __name__ == '__main__':
-	print "EPWM1_PCCTL was " + hex(_getReg(EPWM1_PCCTL))
-	print "EPWM2_PCCTL was " + hex(_getReg(EPWM2_PCCTL))
+	_andReg(EPWM1_PCCTL,0x0)
+	_andReg(EPWM2_PCCTL,0x0)
+
+	print "EPWM1_PCCTL initialized as: " + hex(_getReg(EPWM1_PCCTL))
+	print "EPWM2_PCCTL initialized as: " + hex(_getReg(EPWM2_PCCTL))
 
 	_pwm_chpen(EPWM1_PCCTL,0x1)
 	_pwm_chpen(EPWM2_PCCTL,0x1)
 
-	_pwm_oshtwth(EPWM1_PCCTL,0x3)
-	_pwm_oshtwth(EPWM2_PCCTL,0x15)
+	print "EPWM1_CTL's PWM-chopping enabled: " + hex(_getReg(EPWM1_PCCTL))
+	print "EPWM2_CTL's PWM-chopping enabled: " + hex(_getReg(EPWM2_PCCTL))
+
+	_pwm_oshtwth(EPWM1_PCCTL,0x4)
+	_pwm_oshtwth(EPWM2_PCCTL,0x2)
+
+	print "EPWM1_CTL's one-shot purse width changed: " + hex(_getReg(EPWM1_PCCTL))
+	print "EPWM2_CTL's one-shot purse width changed: " + hex(_getReg(EPWM2_PCCTL))
 
 	_pwm_chfreq(EPWM1_PCCTL,0x3)
 	_pwm_chfreq(EPWM2_PCCTL,0x5)
 
+	print "EPWM1_CTL's clock frequency changed: " + hex(_getReg(EPWM1_PCCTL))
+	print "EPWM2_CTL's clock frequency changed: " + hex(_getReg(EPWM2_PCCTL))
+
 	_pwm_chduty(EPWM1_PCCTL,0x5)
 	_pwm_chduty(EPWM2_PCCTL,0x6)
 
-	print "EPWM1_CTL is changed: " + hex(_getReg(EPWM1_PCCTL))
-	print "EPWM2_CTL is changed: " + hex(_getReg(EPWM2_PCCTL))
+	print "EPWM1_CTL's clock duty cycle changed: " + hex(_getReg(EPWM1_PCCTL))
+	print "EPWM2_CTL's clock duty cycle changed: " + hex(_getReg(EPWM2_PCCTL))
 
