@@ -6,6 +6,11 @@ import struct
 MMAP_OFFSET = 0x44c00000 
 MMAP_SIZE   = 0x48ffffff-MMAP_OFFSET 
 
+CM_PER_BASE = 0x44e00000 - MMAP_OFFSET
+CM_PER_EPWMSS1_CLKCTRL = CM_PER_BASE + 0xcc
+CM_PER_EPWMSS0_CLKCTRL = CM_PER_BASE + 0xd4
+CM_PER_EPWMSS2_CLKCTRL = CM_PER_BASE + 0xd8
+
 EPWM1 = 0x48302200 - MMAP_OFFSET #ePWM1, PWM Subsystem 1
 EPWM2 = 0x48304200 - MMAP_OFFSET #ePWM2, PWM Subsystem 2
 
@@ -48,6 +53,16 @@ def _pwm_chduty(address, mask):
 	_orReg(address,mask << 8)
 
 if __name__ == '__main__':
+	val = _getReg(CM_PER_EPWMSS1_CLKCTRL)
+	print "Register CM_PER_EPWMSS1_CLKCTRL was " + hex(val)
+
+	_setReg(CM_PER_EPWMSS1_CLKCTRL, 0x2)
+	_setReg(CM_PER_EPWMSS0_CLKCTRL, 0x2)
+	_setReg(CM_PER_EPWMSS2_CLKCTRL, 0x2)
+
+	val = _getReg(CM_PER_EPWMSS1_CLKCTRL)
+	print "Register CM_PER_EPWMSS1_CLKCTRL was " + hex(val)
+
 	_andReg(EPWM1_PCCTL,0x0)
 	_andReg(EPWM2_PCCTL,0x0)
 

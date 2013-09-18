@@ -19,6 +19,12 @@ MODULE_AUTHOR("Kim");
 #define DEVICE_NAME		"pwm-drv"
 #define SOME_SUB_CLASS		4711
 
+static volatile short *pMMAP = (short*)0x44c00000;
+static volatile short *pEPWM1 = (short*)0x48302200 - pMMAP;
+static volatile short *pEPWM2 = (short*)0x48304200 - pMMAP;
+static volatile short *pPCCTL1 = pEPWM1 + 0x3c;
+static volatile short *pPCCTL2 = pEPWM2 + 0x3c;
+
 /**
  * The context of a device instance
  *
@@ -98,7 +104,7 @@ static ssize_t rtdm_pwm_write_nrt(struct rtdm_dev_context *context,
 }
 
 /**
- * This structure describe the simple RTDM device
+ * This structure describe the RTDM device
  *
  */
 static struct rtdm_device device = {
@@ -134,7 +140,40 @@ static struct rtdm_device device = {
  */
 int __init rtdm_pwm_init(void)
 {
-	return rtdm_dev_register(&device);
+	*pPCCTL1 |= 0x1;
+	*pPCCTL2 |= 0x1;
+
+	res = rtdm_dev_register(&device);
+	if(res == 0) 
+		rtdm_printk("PWM driver registered without errors\n");
+	else
+	{
+		rtdm_printk("PWM driver registration failed: \n");
+		switch(res)
+		{
+			case -EINVAL:
+				rtdm_printk("The device structure contains invalid entries. "
+						"Check kernel log for further details.");
+				break;
+
+			case -ENOMEM:
+				rtdm_printk("The context for an exclusive device cannot be allocated.");
+				break;
+
+			case -EEXIST:
+				rtdm_printk("The specified device name of protocol ID is already in use.");
+				break;
+
+			case -EAGAIN:
+				rtdm_printk("Some /proc entry cannot be created.");
+				break;
+
+			default:
+				rtdm_printk("Unknown error code returned");
+				break;
+		}
+		rtdm_printk("\n");
+	}
 }
 
 /**
@@ -145,7 +184,9 @@ int __init rtdm_pwm_init(void)
  */
 void __exit rtdm_pwm_exit(void)
 {
+	rtdm_printk("PWM: stopping pwm tasks \n");
 	rtdm_dev_unregister(&device, 1000);
+	rtdm_printk("PWM: uninitialized\n");
 }
 
 module_init(rtdm_pwm_init);
