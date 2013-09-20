@@ -87,184 +87,80 @@ def _pwm_tbctl(address, mask):
 
 val = _getReg(CM_PER_EPWMSS1_CLKCTRL)
 print "Register CM_PER_EPWMSS1_CLKCTRL was " + hex(val)
-_setReg(CM_PER_EPWMSS1_CLKCTRL, 0x2)
-val = _getReg(CM_PER_EPWMSS1_CLKCTRL)
-print "Register CM_PER_EPWMSS1_CLKCTRL changed to " + hex(val)
-
-
-val = _getReg(CM_PER_EPWMSS0_CLKCTRL)
-print "Register CM_PER_EPWMSS0_CLKCTRL was " + hex(val)
-_setReg(CM_PER_EPWMSS0_CLKCTRL, 0x2)
-val = _getReg(CM_PER_EPWMSS0_CLKCTRL)
-print "Register CM_PER_EPWMSS0_CLKCTRL changed to " + hex(val)
-
-
-val = _getReg(CM_PER_EPWMSS2_CLKCTRL)
-print "Register CM_PER_EPWMSS2_CLKCTRL was " + hex(val)
-_setReg(CM_PER_EPWMSS2_CLKCTRL, 0x2)
-val = _getReg(CM_PER_EPWMSS2_CLKCTRL)
-print "Register CM_PER_EPWMSS2_CLKCTRL changed to " + hex(val)
-
-
 
 """ Setup contermode and clock"""
 val = _getReg(PWMSS_CTRL)
 print "Register PWMSS_CTRL was " + hex(val)
-_setReg(PWMSS_CTRL, 0x0)
-val = _getReg(PWMSS_CTRL)
-print "Register PWMSS_CTRL changed to " + hex(val)
-#pwmss_ctrl PWMSS2_TBCLKEN = 1
-#pwmss_ctrl PWMSS1_TBCLKEN = 1
-#pwmss_ctrl PWMSS0_TBCLKEN = 1
 
 """ Confure ehrpwm counter for up-count mode """
 val = _getReg(EPWM1_TBCTL)
 print "Register EPWM1_TBCTL was " + hex(val)
-_setReg(EPWM1_TBCTL,0x1ca00)
-val = _getReg(EPWM1_TBCTL)
-print "Register EPWM1_TBCTL changed to " + hex(val)
-#val = _getReg(EPWM2_TBCTL)
-#print "Register EPWM2_TBCTL changed to " + hex(val)
-#TBCTL CTRMODE = 0 #up-count mode
-#TBCTL HSPCLKDIV 5
-#TBCTL CLKDIV 6
-#TBCTL PRDLD = 0
 
 """ TBPHS """
 val = _getReg(EPWM1_TBSTS)
 print "Register EPWM1_TBSTS was " + hex(val)
-_setReg(EPWM1_TBSTS,0x1)
-val = _getReg(EPWM1_TBSTS)
-print "Register EPWM1_TBSTS was " + hex(val)
-
 val = _getReg(EPWM1_TBPHSHR)
 print "Register EPWM1_TBPHSHR was " + hex(val)
-_setReg(EPWM1_TBPHSHR,0x0)
-val = _getReg(EPWM1_TBPHSHR)
-print "Register EPWM1_TBPHSHR changed to " + hex(val)
-
 val = _getReg(EPWM1_TBPHS)
 print "Register EPWM1_TBPHS was " + hex(val)
-_setReg(EPWM1_TBPHS,0x99890000L)
-val = _getReg(EPWM1_TBPHS)
-print "Register EPWM1_TBPHS changed to " + hex(val)
-
-val = _getReg(EPWM1_TBCNT)
-print "Register EPWM1_TBCNT was " + hex(val)
-_setReg(EPWM1_TBCNT,0xf4249a01L)
 val = _getReg(EPWM1_TBCNT)
 print "Register EPWM1_TBCNT was " + hex(val)
 
 """ Setup Period """
 val = _getReg(EPWM1_TBPRD)
 print "Register EPWM1_TBPRD was " + hex(val)
-_setReg(EPWM1_TBPRD,0xf424)
-val = _getReg(EPWM1_TBPRD)
-print "Register EPWM1_TBPRD changed to " + hex(val)
 
 """ Setup shadowing (pwm_config in tiehrpwm) """
 val = _getReg(EPWM1_CMPCTL)
 print "Register EPWM1_CMPCTL was " + hex(val)
-_setReg(EPWM1_CMPCTL,0x0)
-val = _getReg(EPWM1_CMPCTL)
-print "Register EPWM1_CMPCTL changed to " + hex(val)
-#_setReg(EPWM2_CMPCTL,0x0)
-#CMPCTL SHDWAMODE = 0
-#CMPCTL SHDWBMODE = 0
-#CMPCTL LOADAMODE = 0
-#CMPCTL LOADBMODE = 0
 
-val = _getReg(EPWM1_CMPAHR)
-print "Register EPWM1_CMPAHR was " + hex(val)
-_setReg(EPWM1_CMPAHR,0x5b8d0000)
 val = _getReg(EPWM1_CMPAHR)
 print "Register EPWM1_CMPAHR was " + hex(val)
 
 """ set duty cycle with CMP (p2056) """
 val = _getReg(EPWM1_CMPA)
 print "Register EPWM1_CMPA was " + hex(val)
-_setReg(EPWM1_CMPA,0x5b8d)
-val = _getReg(EPWM1_CMPA)
-print "Register EPWM1_CMPA changed to " + hex(val)
-
 val = _getReg(EPWM1_CMPB)
 print "Register EPWM1_CMPB was " + hex(val)
-_setReg(EPWM1_CMPB,0x250000)
-val = _getReg(EPWM1_CMPB)
-print "Register EPWM1_CMPB changed to " + hex(val)
-#_setReg(EPWM2_CMPA,0x0)
-#_setReg(EPWM2_CMPB,0x0)
-#CMPA duty cycle
-#CMPB duty cycle
 
 """ Set actions - AQ (p2096 / configure_polarity in tiehrpwm)"""
 val = _getReg(EPWM1_AQCTLA)
 print "Register EPWM1_AQCTLA was " + hex(val)
-_setReg(EPWM1_AQCTLA,0x25)
-val = _getReg(EPWM1_AQCTLA)
-print "Register EPWM1_AQCTLA changed to " + hex(val)
-
 val = _getReg(EPWM1_AQCTLB)
 print "Register EPWM1_AQCTLB was " + hex(val)
-_setReg(EPWM1_AQCTLB,0x0)
-val = _getReg(EPWM1_AQCTLB)
-print "Register EPWM1_AQCTLB changed to " + hex(val)
-#_setReg(EPWM2_AQCTLA,0x1a)
-#_setReg(EPWM2_AQCTLB,0x1a)
-#AQCTLA ZRO = 2
-#AQCTLA CAU = 1 #Up-count
-#AQCTLB ZRO = 2
-#AQCTLB CBU = 1 #Up-count
 
 val = _getReg(EPWM1_AQSFRC)
-print "Register EPWM1_AQSFRC changed to " + hex(val)
+print "Register EPWM1_AQSFRC was " + hex(val)
 val = _getReg(EPWM1_DBCTL)
-print "Register EPWM1_DBCTL changed to " + hex(val)
+print "Register EPWM1_DBCTL was " + hex(val)
 val = _getReg(EPWM1_DBRED)
-print "Register EPWM1_DBRED changed to " + hex(val)
+print "Register EPWM1_DBRED was " + hex(val)
 val = _getReg(EPWM1_DBFED)
-print "Register EPWM1_DBFED changed to " + hex(val)
+print "Register EPWM1_DBFED was " + hex(val)
 val = _getReg(EPWM1_TZCTL)
-print "Register EPWM1_TZCTL changed to " + hex(val)
+print "Register EPWM1_TZCTL was " + hex(val)
 val = _getReg(EPWM1_TZEINT)
-print "Register EPWM1_TZEINT changed to " + hex(val)
+print "Register EPWM1_TZEINT was " + hex(val)
 val = _getReg(EPWM1_TZFLG)
-print "Register EPWM1_TZFLG changed to " + hex(val)
+print "Register EPWM1_TZFLG was " + hex(val)
 val = _getReg(EPWM1_TZCLR)
-print "Register EPWM1_TZCLR changed to " + hex(val)
+print "Register EPWM1_TZCLR was " + hex(val)
 val = _getReg(EPWM1_TZFRC)
-print "Register EPWM1_TZFRC changed to " + hex(val)
+print "Register EPWM1_TZFRC was " + hex(val)
 
 """ Set interrupts ()"""
 val = _getReg(EPWM1_ETSEL)
 print "Register EPWM1_ETSEL was " + hex(val)
-_setReg(EPWM1_ETSEL,0x0)
-val = _getReg(EPWM1_ETSEL)
-print "Register EPWM1_ETSEL changed to " + hex(val)
-
 val = _getReg(EPWM1_ETPS)
 print "Register EPWM1_ETPS was " + hex(val)
-_setReg(EPWM1_ETPS,0x0)
-val = _getReg(EPWM1_ETPS)
-print "Register EPWM1_ETPS changed to " + hex(val)
-
-#_setReg(EPWM2_ETSEL,0x9)
-#_setReg(EPWM2_ETPS,0x1)
-#ETSEL INSEL = 1
-#ETSEL INTEN = 1
-#ETPS INTPRD = 1
 
 val = _getReg(EPWM1_ETFLG)
-print "Register EPWM1_ETFLG changed to " + hex(val)
+print "Register EPWM1_ETFLG was " + hex(val)
 val = _getReg(EPWM1_ETCLR)
-print "Register EPWM1_ETCLR changed to " + hex(val)
+print "Register EPWM1_ETCLR was " + hex(val)
 val = _getReg(EPWM1_PCCTL)
-print "Register EPWM1_PCCTL changed to " + hex(val)
+print "Register EPWM1_PCCTL was " + hex(val)
 val = _getReg(EPWM1_HRCTL)
-print "Register EPWM1_HRCTL changed to " + hex(val)
-
-
-
-
+print "Register EPWM1_HRCTL was " + hex(val)
 
 

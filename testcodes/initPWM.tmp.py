@@ -91,22 +91,6 @@ _setReg(CM_PER_EPWMSS1_CLKCTRL, 0x2)
 val = _getReg(CM_PER_EPWMSS1_CLKCTRL)
 print "Register CM_PER_EPWMSS1_CLKCTRL changed to " + hex(val)
 
-
-val = _getReg(CM_PER_EPWMSS0_CLKCTRL)
-print "Register CM_PER_EPWMSS0_CLKCTRL was " + hex(val)
-_setReg(CM_PER_EPWMSS0_CLKCTRL, 0x2)
-val = _getReg(CM_PER_EPWMSS0_CLKCTRL)
-print "Register CM_PER_EPWMSS0_CLKCTRL changed to " + hex(val)
-
-
-val = _getReg(CM_PER_EPWMSS2_CLKCTRL)
-print "Register CM_PER_EPWMSS2_CLKCTRL was " + hex(val)
-_setReg(CM_PER_EPWMSS2_CLKCTRL, 0x2)
-val = _getReg(CM_PER_EPWMSS2_CLKCTRL)
-print "Register CM_PER_EPWMSS2_CLKCTRL changed to " + hex(val)
-
-
-
 """ Setup contermode and clock"""
 val = _getReg(PWMSS_CTRL)
 print "Register PWMSS_CTRL was " + hex(val)
@@ -145,13 +129,13 @@ print "Register EPWM1_TBPHSHR changed to " + hex(val)
 
 val = _getReg(EPWM1_TBPHS)
 print "Register EPWM1_TBPHS was " + hex(val)
-_setReg(EPWM1_TBPHS,0x99890000L)
+_setReg(EPWM1_TBPHS,0x2a3f0000)
 val = _getReg(EPWM1_TBPHS)
 print "Register EPWM1_TBPHS changed to " + hex(val)
 
 val = _getReg(EPWM1_TBCNT)
 print "Register EPWM1_TBCNT was " + hex(val)
-_setReg(EPWM1_TBCNT,0xf4249a01L)
+_setReg(EPWM1_TBCNT,0xf4242aa3L)
 val = _getReg(EPWM1_TBCNT)
 print "Register EPWM1_TBCNT was " + hex(val)
 
@@ -176,14 +160,14 @@ print "Register EPWM1_CMPCTL changed to " + hex(val)
 
 val = _getReg(EPWM1_CMPAHR)
 print "Register EPWM1_CMPAHR was " + hex(val)
-_setReg(EPWM1_CMPAHR,0x5b8d0000)
+_setReg(EPWM1_CMPAHR,0x7a120000)
 val = _getReg(EPWM1_CMPAHR)
 print "Register EPWM1_CMPAHR was " + hex(val)
 
 """ set duty cycle with CMP (p2056) """
 val = _getReg(EPWM1_CMPA)
 print "Register EPWM1_CMPA was " + hex(val)
-_setReg(EPWM1_CMPA,0x5b8d)
+_setReg(EPWM1_CMPA,0x7a12)
 val = _getReg(EPWM1_CMPA)
 print "Register EPWM1_CMPA changed to " + hex(val)
 
