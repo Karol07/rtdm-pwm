@@ -1,23 +1,3 @@
-/***************************************************************************
- *   Copyright (C) 2007 by trem (Philippe Reynes)                          *
- *   tremyfr@yahoo.fr                                                      *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program; if not, write to the                         *
- *   Free Software Foundation, Inc.,                                       *
- *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
- ***************************************************************************/
-
 /**
  * This kernel driver demonstrates how an RTDM device can be called from
  * a RT task and how to use a semaphore to create a blocking device operation.
@@ -34,11 +14,32 @@
 #include <rtdm/rtdm_driver.h>
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("trem");
+MODULE_AUTHOR("Kim Seonghyun");
+
 
 #define SIZE_MAX			1024
-#define DEVICE_NAME			"tut02-skeleton-drv01"
+#define DEVICE_NAME			"mf2044-pwm-drv"
 #define SOME_SUB_CLASS			4711
+
+#define AUTHOR "Kim Seonghyun"
+
+//system
+#define SYSTEM_CLOCK 234E3
+#define TBCLK 234E3
+#define PWM_CARRIER 50
+
+//defines
+volatile short *pCM_PER_BASE = (short*)0x44e00000;
+volatile short *pCM_PER_EPWMSS1_CLKCTRL = (short*)CM_PER_BASE + 0xcc;
+volatile short *pCM_PER_EPWMSS0_CLKCTRL = (short*)CM_PER_BASE + 0xd4;
+volatile short *pCM_PER_EPWMSS2_CLKCTRL = (short*)CM_PER_BASE + 0xd8;
+
+volatile short *pPWM_CTRL = (short*)CM_PER_BASE + 0x664;
+volatile short *pPWMSS1 = (short*)0x48302000;
+volatile short *pPWMSS1_EPWM1 = (short*)0x48302200;
+volatile short *pPWMSS1_EPWM2 = (short*)0x48304200;
+
+volatile short *pPWMSS1_EPWM1_CMPA = (short*)pPWMSS1_EPWM1+0x12;
 
 /**
  * The structure of the buffer
@@ -134,6 +135,11 @@ static ssize_t simple_rtdm_write_rt(struct rtdm_dev_context *context,
 	if (ret)
 		return ret;
 
+
+	int duty_perc = simple_strtoul(buf, NULL, 0);
+
+	*pCM_PER_EPWMSS2_CLKCTRL &= (0x2);
+
 	/* release the semaphore */
 	rtdm_sem_up(&sem);
 
@@ -164,10 +170,10 @@ static struct rtdm_device device = {
 	.device_class = RTDM_CLASS_EXPERIMENTAL,
 	.device_sub_class = SOME_SUB_CLASS,
 	.profile_version = 1,
-	.driver_name = "SimpleRTDM",
+	.driver_name = "PwmRTDM",
 	.driver_version = RTDM_DRIVER_VER(0, 1, 2),
-	.peripheral_name = "Simple RTDM example",
-	.provider_name = "trem",
+	.peripheral_name = "PWM RTDM",
+	.provider_name = AUTHOR,
 	.proc_name = device.device_name,
 };
 
@@ -182,7 +188,41 @@ int __init simple_rtdm_init(void)
 	buffer.size = 0;		/* clear the buffer */
 	rtdm_sem_init(&sem, 0);		/* init the global semaphore */
 
-	return rtdm_dev_register(&device);
+	int res =  rtdm_dev_register(&device);
+	if (res) {
+		rtdm_printk("PWM driver registered without errors\n");
+	} else {
+		rtdm_printk("PWM driver registration failed: \n");
+		switch(res)
+		{
+			case -EINVAL: 
+				rtdm_printk("The device structure contains invalid entries. "
+						"Check kernel log for further details.");
+				break;
+
+			case -ENOMEM: 
+				rtdm_printk("The context for an exclusive device cannot be allocated.");
+				break;
+
+			case -EEXIST:
+				rtdm_printk("The specified device name of protocol ID is already in use.");
+				break;
+
+			case -EAGAIN: rtdm_printk("Some /proc entry cannot be created.");
+				      break;
+
+			default:
+				      rtdm_printk("Unknown error code returned");
+				      break;
+		}
+		rtdm_printk("\n");
+	}
+
+	*pCM_PER_EPWMSS1_CLKCTRL &= (0x2);
+	*pCM_PER_EPWMSS0_CLKCTRL &= (0x2);
+	*pCM_PER_EPWMSS2_CLKCTRL &= (0x2);
+
+	return yes;
 }
 
 /**
@@ -193,7 +233,14 @@ int __init simple_rtdm_init(void)
  */
 void __exit simple_rtdm_exit(void)
 {
+	rtdm_printk("PWM: stopping pwm tasks\n");
+
+	*pCM_PER_EPWMSS1_CLKCTRL &= (0x2);
+	*pCM_PER_EPWMSS0_CLKCTRL &= (0x2);
+	*pCM_PER_EPWMSS2_CLKCTRL &= (0x2);
+
 	rtdm_dev_unregister(&device, 1000);
+	rtdm_printk("PWM: uninitialized\n");
 }
 
 module_init(simple_rtdm_init);

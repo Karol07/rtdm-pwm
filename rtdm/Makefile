@@ -1,13 +1,13 @@
 ###### CONFIGURATION ######
 
 ### List of applications to be build
-APPLICATIONS = tut01-skeleton-app tut02-skeleton-app
+APPLICATIONS = mf2044-pwm-app
 
 ### Note: to override the search path for the xeno-config script, use "make XENO=..."
 
 
 ### List of modules to be build
-MODULES = heartbeat tut01-skeleton-drv tut02-skeleton-drv
+MODULES = mf2044-pwm-drv
 
 ### Note: to override the kernel source path, use "make KSRC=..."
 
