@@ -84,12 +84,6 @@ print "Register EPWM1_TBCTL was " + hex(val)
 _setReg(EPWM1_TBCTL,0x1ca00)
 val = _getReg(EPWM1_TBCTL)
 print "Register EPWM1_TBCTL changed to " + hex(val)
-#val = _getReg(EPWM2_TBCTL)
-#print "Register EPWM2_TBCTL changed to " + hex(val)
-#TBCTL CTRMODE = 0 #up-count mode
-#TBCTL HSPCLKDIV 5
-#TBCTL CLKDIV 6
-#TBCTL PRDLD = 0
 
 """ TBPHS """
 val = _getReg(EPWM1_TBSTS)

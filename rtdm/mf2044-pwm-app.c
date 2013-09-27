@@ -1,27 +1,3 @@
-/**
- * This is an example that shows how blocking RTDM devices can be used
- * with a user space program in realtime context.
- *
- * The device tut02-skeleton-drv01 stores data that you write into.
- * When you read from this device, previously stored data is returned,
- * and the internal buffer is erased. If you try to read more than you have
- * written, the reader is blocked until the next write took place.
- *
- * This program does the following:
- * - If you give an argument to the command line, this argument is written
- *   in the device (with rt_dev_write)
- * - If you don't give an argument to the command line, the progam read
- *   in the device (with rt_dev_read).
- *
- * To test this application, you just need to:
- *
- * $ export LD_LIBRARY_PATH=<path of xenomai>/lib
- * $ insmod tut02-skeleton-drv.ko
- * $ ./tut02-skeleton-app "Hello Master"
- * $ ./tut02-skeleton-app
- *
- */
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/mman.h>	/* for MCL_CURRENT and MCL_FUTURE */

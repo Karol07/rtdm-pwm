@@ -17,7 +17,7 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Kim Seonghyun");
 
 
-#define SIZE_MAX			1024
+#define BUF_SIZE_MAX			1024
 #define DEVICE_NAME			"mf2044-pwm-drv"
 #define SOME_SUB_CLASS			4711
 
@@ -30,16 +30,16 @@ MODULE_AUTHOR("Kim Seonghyun");
 
 //defines
 volatile short *pCM_PER_BASE = (short*)0x44e00000;
-volatile short *pCM_PER_EPWMSS1_CLKCTRL = (short*)CM_PER_BASE + 0xcc;
-volatile short *pCM_PER_EPWMSS0_CLKCTRL = (short*)CM_PER_BASE + 0xd4;
-volatile short *pCM_PER_EPWMSS2_CLKCTRL = (short*)CM_PER_BASE + 0xd8;
+volatile short *pCM_PER_EPWMSS1_CLKCTRL = (short*)0x44e000cc;
+volatile short *pCM_PER_EPWMSS0_CLKCTRL = (short*)0x44e000d4;
+volatile short *pCM_PER_EPWMSS2_CLKCTRL = (short*)0x44e000d8;
 
-volatile short *pPWM_CTRL = (short*)CM_PER_BASE + 0x664;
+volatile short *pPWM_CTRL = (short*)0x44e00664;
 volatile short *pPWMSS1 = (short*)0x48302000;
 volatile short *pPWMSS1_EPWM1 = (short*)0x48302200;
 volatile short *pPWMSS1_EPWM2 = (short*)0x48304200;
 
-volatile short *pPWMSS1_EPWM1_CMPA = (short*)pPWMSS1_EPWM1+0x12;
+volatile short *pPWMSS1_EPWM1_CMPA = (short*)0x48302212;
 
 /**
  * The structure of the buffer
@@ -47,7 +47,7 @@ volatile short *pPWMSS1_EPWM1_CMPA = (short*)pPWMSS1_EPWM1+0x12;
  */
 typedef struct buffer_s {
 	int size;
-	char data[SIZE_MAX];
+	char data[BUF_SIZE_MAX];
 } buffer_t;
 
 /**
@@ -126,19 +126,20 @@ static ssize_t simple_rtdm_write_rt(struct rtdm_dev_context *context,
 				     const void *buf, size_t nbyte)
 {
 	int ret;
+	unsigned long duty_perc = 0;
 
 	/* write the user buffer in the kernel buffer */
-	buffer.size = (nbyte > SIZE_MAX) ? SIZE_MAX : nbyte;
+	buffer.size = (nbyte > BUF_SIZE_MAX) ? BUF_SIZE_MAX : nbyte;
 	ret = rtdm_safe_copy_from_user(user_info, buffer.data, buf, buffer.size);
 
 	/* if an error has occured, send it to user */
 	if (ret)
 		return ret;
 
+	duty_perc = simple_strtoul(buf, NULL, 0);
+	rtdm_printk("Write value %lu", duty_perc);
 
-	int duty_perc = simple_strtoul(buf, NULL, 0);
-
-	*pCM_PER_EPWMSS2_CLKCTRL &= (0x2);
+//	*pCM_PER_EPWMSS2_CLKCTRL &= (0x2);
 
 	/* release the semaphore */
 	rtdm_sem_up(&sem);
@@ -170,9 +171,9 @@ static struct rtdm_device device = {
 	.device_class = RTDM_CLASS_EXPERIMENTAL,
 	.device_sub_class = SOME_SUB_CLASS,
 	.profile_version = 1,
-	.driver_name = "PwmRTDM",
+	.driver_name = "RTDM-PWM",
 	.driver_version = RTDM_DRIVER_VER(0, 1, 2),
-	.peripheral_name = "PWM RTDM",
+	.peripheral_name = "RTDM-PWM",
 	.provider_name = AUTHOR,
 	.proc_name = device.device_name,
 };
@@ -185,35 +186,32 @@ static struct rtdm_device device = {
  */
 int __init simple_rtdm_init(void)
 {
+	int res = -1;
 	buffer.size = 0;		/* clear the buffer */
 	rtdm_sem_init(&sem, 0);		/* init the global semaphore */
 
-	int res =  rtdm_dev_register(&device);
+	res =  rtdm_dev_register(&device);
 	if (res) {
 		rtdm_printk("PWM driver registered without errors\n");
 	} else {
 		rtdm_printk("PWM driver registration failed: \n");
-		switch(res)
-		{
+		switch(res) {
 			case -EINVAL: 
 				rtdm_printk("The device structure contains invalid entries. "
 						"Check kernel log for further details.");
 				break;
-
 			case -ENOMEM: 
 				rtdm_printk("The context for an exclusive device cannot be allocated.");
 				break;
-
 			case -EEXIST:
 				rtdm_printk("The specified device name of protocol ID is already in use.");
 				break;
-
-			case -EAGAIN: rtdm_printk("Some /proc entry cannot be created.");
-				      break;
-
+			case -EAGAIN: 
+				rtdm_printk("Some /proc entry cannot be created.");
+				break;
 			default:
-				      rtdm_printk("Unknown error code returned");
-				      break;
+				rtdm_printk("Unknown error code returned");
+				break;
 		}
 		rtdm_printk("\n");
 	}
@@ -222,7 +220,7 @@ int __init simple_rtdm_init(void)
 	*pCM_PER_EPWMSS0_CLKCTRL &= (0x2);
 	*pCM_PER_EPWMSS2_CLKCTRL &= (0x2);
 
-	return yes;
+	return res;
 }
 
 /**
@@ -235,9 +233,9 @@ void __exit simple_rtdm_exit(void)
 {
 	rtdm_printk("PWM: stopping pwm tasks\n");
 
-	*pCM_PER_EPWMSS1_CLKCTRL &= (0x2);
-	*pCM_PER_EPWMSS0_CLKCTRL &= (0x2);
-	*pCM_PER_EPWMSS2_CLKCTRL &= (0x2);
+	*pCM_PER_EPWMSS1_CLKCTRL &= (0x0);
+	*pCM_PER_EPWMSS0_CLKCTRL &= (0x0);
+	*pCM_PER_EPWMSS2_CLKCTRL &= (0x0);
 
 	rtdm_dev_unregister(&device, 1000);
 	rtdm_printk("PWM: uninitialized\n");
