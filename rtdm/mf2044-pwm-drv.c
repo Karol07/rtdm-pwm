@@ -1,66 +1,71 @@
 /**
- * This kernel driver demonstrates how an RTDM device can be called from
- * a RT task and how to use a semaphore to create a blocking device operation.
+ * This kernel driver demonstrates how an RTDM device can be set up.
  *
  * It is a simple device, only 4 operation are provided:
  *  - open:  start device usage
  *  - close: ends device usage
- *  - write: store transfered data in an internal buffer (realtime context)
- *  - read:  return previously stored data and erase buffer (realtime context)
+ *  - write: store transfered data in an internal buffer
+ *  - read:  return previously stored data and erase buffer
  *
  */
 
-#include <linux/module.h>
 #include <rtdm/rtdm_driver.h>
+#include <linux/module.h>
+#include <linux/platform_device.h>
+#include <linux/pwm.h>
+#include <linux/slab.h>
+#include <linux/io.h>
+#include <linux/err.h>
+#include <linux/clk.h>
+#include <linux/pm_runtime.h>
+#include <linux/pinctrl/consumer.h>
 
+static unsigned int index;
+module_param(index,uint,0400);
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Kim Seonghyun");
+MODULE_AUTHOR("Seonghyun Kim");
 
+#define SIZE_MAX		1024
+#define DEVICE_NAME		"mf2044-pwm-drv"
+#define SOME_SUB_CLASS		4711
 
-#define BUF_SIZE_MAX			1024
-#define DEVICE_NAME			"mf2044-pwm-drv"
-#define SOME_SUB_CLASS			4711
+void __iomem *cm_per_map;
+void __iomem *epwm1_0_map;
 
-#define AUTHOR "Kim Seonghyun"
+#define CM_PER_BASE 0x44e00000
+#define CM_PER_SZ 0x44e03fff-CM_PER_BASE
+#define EPWMSS1_CLK_CTRL 0xcc
+#define EPWMSS0_CLK_CTRL 0xd4
+#define EPWMSS2_CLK_CTRL 0xd8
 
-//system
-#define SYSTEM_CLOCK 234E3
-#define TBCLK 234E3
-#define PWM_CARRIER 50
+#define EPWM1_0_BASE 0x48302200
+#define EPWM1_0_SZ 0x4830225f-EPWM1_0_BASE
+#define TBPRD 0xa
+#define CMPAHR 0x10
 
-//defines
-volatile short *pCM_PER_BASE = (short*)0x44e00000;
-volatile short *pCM_PER_EPWMSS1_CLKCTRL = (short*)0x44e000cc;
-volatile short *pCM_PER_EPWMSS0_CLKCTRL = (short*)0x44e000d4;
-volatile short *pCM_PER_EPWMSS2_CLKCTRL = (short*)0x44e000d8;
+#define MF2044_IOCTL_MAGIC 0x00
+#define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
+#define MF2044_IOCTL_OFF _IO(MF2044_IOCTL_MAGIC, 2)
+#define MF2044_IOCTL_GET_DUTY_CYCLE _IOW(MF2044_IOCTL_MAGIC, 3, int)
+#define MF2044_IOCTL_SET_DUTY_CYCLE _IOW(MF2044_IOCTL_MAGIC, 4, int)
+#define MF2044_IOCTL_GET_FREQUENCY _IOW(MF2044_IOCTL_MAGIC, 5, int)
+#define MF2044_IOCTL_SET_FREQUENCY _IOW(MF2044_IOCTL_MAGIC, 6, int)
 
-volatile short *pPWM_CTRL = (short*)0x44e00664;
-volatile short *pPWMSS1 = (short*)0x48302000;
-volatile short *pPWMSS1_EPWM1 = (short*)0x48302200;
-volatile short *pPWMSS1_EPWM2 = (short*)0x48304200;
-
-volatile short *pPWMSS1_EPWM1_CMPA = (short*)0x48302212;
+static dev_t dev;
+static struct device *dev_ret;
+static struct class *cl;
 
 /**
- * The structure of the buffer
+ * The context of a device instance
+ *
+ * A context is created each time a device is opened and passed to
+ * other device handlers when they are called.
  *
  */
 typedef struct buffer_s {
 	int size;
-	char data[BUF_SIZE_MAX];
+	char data[SIZE_MAX];
 } buffer_t;
-
-/**
- * The global buffer
- *
- */
-buffer_t buffer;
-
-/**
- * The global semaphore
- *
- */
-rtdm_sem_t sem;
 
 /**
  * Open the device
@@ -68,9 +73,12 @@ rtdm_sem_t sem;
  * This function is called when the device shall be opened.
  *
  */
-static int simple_rtdm_open(struct rtdm_dev_context *context,
+static int simple_rtdm_open_nrt(struct rtdm_dev_context *context,
 				rtdm_user_info_t * user_info, int oflags)
 {
+	buffer_t * buffer = (buffer_t *) context->dev_private;
+	buffer->size = 0; /* clear the buffer */
+
 	return 0;
 }
 
@@ -80,8 +88,8 @@ static int simple_rtdm_open(struct rtdm_dev_context *context,
  * This function is called when the device shall be closed.
  *
  */
-static int simple_rtdm_close(struct rtdm_dev_context *context,
-				rtdm_user_info_t * user_info)
+static int simple_rtdm_close_nrt(struct rtdm_dev_context *context,
+				 rtdm_user_info_t * user_info)
 {
 	return 0;
 }
@@ -89,28 +97,19 @@ static int simple_rtdm_close(struct rtdm_dev_context *context,
 /**
  * Read from the device
  *
- * This function is called when the device is read in realtime context.
+ * This function is called when the device is read in non-realtime context.
  *
  */
-static ssize_t simple_rtdm_read_rt(struct rtdm_dev_context *context,
+static ssize_t simple_rtdm_read_nrt(struct rtdm_dev_context *context,
 				    rtdm_user_info_t * user_info, void *buf,
 				    size_t nbyte)
 {
-	int ret, size;
+	buffer_t * buffer = (buffer_t *) context->dev_private;
+	int size = (buffer->size > nbyte) ? nbyte : buffer->size;
 
-	/* take the semaphore */
-	rtdm_sem_down(&sem);
-
-	/* read the kernel buffer and sent it to user space */
-	size = (buffer.size > nbyte) ? nbyte : buffer.size;
-	ret = rtdm_safe_copy_to_user(user_info, buf, buffer.data, size);
-
-	/* if an error has occured, send it to user */
-	if (ret)
-		return ret;
-
-	/* clean the kernel buffer */
-	buffer.size = 0;
+	buffer->size = 0;
+	if (rtdm_safe_copy_to_user(user_info, buf, buffer->data, size))
+		rtdm_printk("ERROR : can't copy data from driver\n");
 
 	return size;
 }
@@ -118,33 +117,44 @@ static ssize_t simple_rtdm_read_rt(struct rtdm_dev_context *context,
 /**
  * Write in the device
  *
- * This function is called when the device is written in realtime context.
+ * This function is called when the device is written in non-realtime context.
  *
  */
-static ssize_t simple_rtdm_write_rt(struct rtdm_dev_context *context,
+static ssize_t simple_rtdm_write_nrt(struct rtdm_dev_context *context,
 				     rtdm_user_info_t * user_info,
 				     const void *buf, size_t nbyte)
 {
-	int ret;
-	unsigned long duty_perc = 0;
+	buffer_t * buffer = (buffer_t *) context->dev_private;
 
-	/* write the user buffer in the kernel buffer */
-	buffer.size = (nbyte > BUF_SIZE_MAX) ? BUF_SIZE_MAX : nbyte;
-	ret = rtdm_safe_copy_from_user(user_info, buffer.data, buf, buffer.size);
-
-	/* if an error has occured, send it to user */
-	if (ret)
-		return ret;
-
-	duty_perc = simple_strtoul(buf, NULL, 0);
-	rtdm_printk("Write value %lu", duty_perc);
-
-//	*pCM_PER_EPWMSS2_CLKCTRL &= (0x2);
-
-	/* release the semaphore */
-	rtdm_sem_up(&sem);
+	buffer->size = (nbyte > SIZE_MAX) ? SIZE_MAX : nbyte;
+	if (rtdm_safe_copy_from_user(user_info, buffer->data, buf, buffer->size))
+		rtdm_printk("ERROR : can't copy data to driver\n");
 
 	return nbyte;
+}
+
+static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
+		rtdm_user_info_t *user_info, 
+		unsigned int request, void __user *arg)
+{
+	int retval = 0;
+	rtdm_printk("request - %d\n",request);
+
+	switch(request)
+	{
+		case MF2044_IOCTL_ON:
+			break;
+		case MF2044_IOCTL_OFF:
+			break;
+		case MF2044_IOCTL_GET_DUTY_CYCLE:
+			break;
+		case MF2044_IOCTL_SET_DUTY_CYCLE:
+			break;
+		case MF2044_IOCTL_GET_FREQUENCY:
+			break;
+		case MF2044_IOCTL_SET_FREQUENCY:
+			break;
+	}
 }
 
 /**
@@ -154,27 +164,27 @@ static ssize_t simple_rtdm_write_rt(struct rtdm_dev_context *context,
 static struct rtdm_device device = {
 	.struct_version = RTDM_DEVICE_STRUCT_VER,
 
-	.device_flags = RTDM_NAMED_DEVICE,
-	.context_size = 0,
+	.device_flags = RTDM_NAMED_DEVICE | RTDM_EXCLUSIVE,
+	.context_size = sizeof(buffer_t),
 	.device_name = DEVICE_NAME,
 
-	.open_nrt = simple_rtdm_open,
-	.open_rt  = simple_rtdm_open,
+	.open_nrt = simple_rtdm_open_nrt,
 
 	.ops = {
-		.close_nrt = simple_rtdm_close,
-		.close_rt  = simple_rtdm_close,
-		.read_rt   = simple_rtdm_read_rt,
-		.write_rt  = simple_rtdm_write_rt,
+		.close_nrt = simple_rtdm_close_nrt,
+//		.read_nrt = simple_rtdm_read_nrt,
+//		.write_nrt = simple_rtdm_write_nrt,
+		.ioctl_rt = mf2044_rtdm_ioctl_nrt,
+		.ioctl_nrt = mf2044_rtdm_ioctl_nrt,
 	},
 
 	.device_class = RTDM_CLASS_EXPERIMENTAL,
 	.device_sub_class = SOME_SUB_CLASS,
 	.profile_version = 1,
-	.driver_name = "RTDM-PWM",
-	.driver_version = RTDM_DRIVER_VER(0, 1, 2),
-	.peripheral_name = "RTDM-PWM",
-	.provider_name = AUTHOR,
+	.driver_name = "mf2044_pwm",
+	.driver_version = RTDM_DRIVER_VER(0, 1, 0),
+	.peripheral_name = "pwm driver for mf2044",
+	.provider_name = "Seonghyun Kim",
 	.proc_name = device.device_name,
 };
 
@@ -187,11 +197,10 @@ static struct rtdm_device device = {
 int __init simple_rtdm_init(void)
 {
 	int res = -1;
-	buffer.size = 0;		/* clear the buffer */
-	rtdm_sem_init(&sem, 0);		/* init the global semaphore */
+	unsigned int tbprd = -1;
+	res = rtdm_dev_register(&device);
 
-	res =  rtdm_dev_register(&device);
-	if (res) {
+	if (0 == res) {
 		rtdm_printk("PWM driver registered without errors\n");
 	} else {
 		rtdm_printk("PWM driver registration failed: \n");
@@ -215,10 +224,33 @@ int __init simple_rtdm_init(void)
 		}
 		rtdm_printk("\n");
 	}
+	cm_per_map = ioremap(CM_PER_BASE,CM_PER_SZ);
+	epwm1_0_map = ioremap(EPWM1_0_BASE,EPWM1_0_SZ);
 
-	*pCM_PER_EPWMSS1_CLKCTRL &= (0x2);
-	*pCM_PER_EPWMSS0_CLKCTRL &= (0x2);
-	*pCM_PER_EPWMSS2_CLKCTRL &= (0x2);
+	iowrite32(0x2, cm_per_map+EPWMSS1_CLK_CTRL);
+	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
+	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
+
+	iowrite32(0x124f8, epwm1_0_map+TBPRD);
+	tbprd = ioread32(epwm1_0_map+TBPRD);
+	rtdm_printk("tbprd %08x\n",tbprd);
+
+	iowrite32(0xf424, epwm1_0_map+TBPRD);
+	tbprd = ioread32(epwm1_0_map+TBPRD);
+	rtdm_printk("tbprd %08x\n",tbprd);
+
+	iowrite32(0x568d0000, epwm1_0_map+CMPAHR); //tbprd
+
+	rtdm_printk("ioctl %d", MF2044_IOCTL_GET_DUTY_CYCLE);
+	rtdm_printk("ioctl %d", MF2044_IOCTL_SET_DUTY_CYCLE);
+
+//	if (IS_ERR(cl = class_create(THIS_MODULE,"char")))
+//		rtdm_printk("class_create failed\n");
+//	rtdm_printk("class_create\n");
+//
+//	if (IS_ERR(dev_ret = device_create(cl,NULL,dev,NULL,"zedoul")))
+//		rtdm_printk("device_create failed\n");
+//	rtdm_printk("device_create\n");
 
 	return res;
 }
@@ -231,14 +263,11 @@ int __init simple_rtdm_init(void)
  */
 void __exit simple_rtdm_exit(void)
 {
-	rtdm_printk("PWM: stopping pwm tasks\n");
-
-	*pCM_PER_EPWMSS1_CLKCTRL &= (0x0);
-	*pCM_PER_EPWMSS0_CLKCTRL &= (0x0);
-	*pCM_PER_EPWMSS2_CLKCTRL &= (0x0);
+	iowrite32(0x0, cm_per_map+0xcc);
+	iowrite32(0x0, cm_per_map+0xd4);
+	iowrite32(0x0, cm_per_map+0xd8);
 
 	rtdm_dev_unregister(&device, 1000);
-	rtdm_printk("PWM: uninitialized\n");
 }
 
 module_init(simple_rtdm_init);
