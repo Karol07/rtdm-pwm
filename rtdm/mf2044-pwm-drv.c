@@ -137,7 +137,7 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		rtdm_user_info_t *user_info, 
 		unsigned int request, void __user *arg)
 {
-	int retval = 0;
+	unsigned int res=0;
 	rtdm_printk("request - %d\n",request);
 
 	switch(request)
@@ -147,12 +147,16 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		case MF2044_IOCTL_OFF:
 			break;
 		case MF2044_IOCTL_GET_DUTY_CYCLE:
+			res = ioread32(epwm1_0_map+CMPAHR);
+			*(int *)arg = res;
 			break;
 		case MF2044_IOCTL_SET_DUTY_CYCLE:
+			iowrite32(0x568d0000, epwm1_0_map+CMPAHR); //tbprd
 			break;
 		case MF2044_IOCTL_GET_FREQUENCY:
 			break;
 		case MF2044_IOCTL_SET_FREQUENCY:
+			iowrite32(0xf424, epwm1_0_map+CMPAHR); //tbprd
 			break;
 	}
 }
@@ -231,19 +235,19 @@ int __init simple_rtdm_init(void)
 	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
 	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
 
-	iowrite32(0x124f8, epwm1_0_map+TBPRD);
-	tbprd = ioread32(epwm1_0_map+TBPRD);
+	iowrite32(0x124f8, epwm1_0_map+CMPAHR);
+	tbprd = ioread32(epwm1_0_map+CMPAHR);
 	rtdm_printk("tbprd %08x\n",tbprd);
+//
+//	iowrite32(0xf424, epwm1_0_map+TBPRD);
+//	tbprd = ioread32(epwm1_0_map+TBPRD);
+//	rtdm_printk("tbprd %08x\n",tbprd);
+//
+//	iowrite32(0x568d0000, epwm1_0_map+CMPAHR); //tbprd
 
-	iowrite32(0xf424, epwm1_0_map+TBPRD);
-	tbprd = ioread32(epwm1_0_map+TBPRD);
-	rtdm_printk("tbprd %08x\n",tbprd);
-
-	iowrite32(0x568d0000, epwm1_0_map+CMPAHR); //tbprd
-
-	rtdm_printk("ioctl %d", MF2044_IOCTL_GET_DUTY_CYCLE);
-	rtdm_printk("ioctl %d", MF2044_IOCTL_SET_DUTY_CYCLE);
-
+//	rtdm_printk("ioctl %d", MF2044_IOCTL_GET_DUTY_CYCLE);
+//	rtdm_printk("ioctl %d", MF2044_IOCTL_SET_DUTY_CYCLE);
+//
 //	if (IS_ERR(cl = class_create(THIS_MODULE,"char")))
 //		rtdm_printk("class_create failed\n");
 //	rtdm_printk("class_create\n");

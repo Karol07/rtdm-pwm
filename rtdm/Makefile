@@ -1,10 +1,10 @@
 ###### CONFIGURATION ######
 
 ### List of applications to be build
-APPLICATIONS = mf2044-pwm-app
+APPLICATIONS = mf2044-pwm-app mf2044-pwm-lib
 
 ### LIst of libraries to be build
-LIBRARIES = mf2044-pwm-lib 
+#LIBRARIES = mf2044-pwm-lib 
 ### Note: to override the search path for the xeno-config script, use "make XENO=..."
 
 ### List of modules to be build
@@ -50,14 +50,14 @@ endif
 endif
 
 
-ifneq ($(LIBRARIES),)
-all::
-	$(CC) -c -fPIC mf2044-pwm-lib.c -o mf2044-pwm-lib.o $(CFLAGS) $(LDFLAGS)
-	$(CC) mf2044-pwm-lib.o -shared -o libmf2044-pwm-lib.so
-clean::
-	$(RM) $(LIBRARIES) *.so
-
-endif
+#ifneq ($(LIBRARIES),)
+#all::
+#	$(CC) -c -fPIC mf2044-pwm-lib.c -o mf2044-pwm-lib.o $(CFLAGS) $(LDFLAGS)
+#	$(CC) mf2044-pwm-lib.o -shared -o libmf2044-pwm-lib.so
+#clean::
+#	$(RM) $(LIBRARIES) *.so
+#
+#endif
 
 ###### KERNEL MODULE BUILD (no change required normally) ######
 ifneq ($(MODULES),)
