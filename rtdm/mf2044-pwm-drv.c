@@ -40,11 +40,13 @@ void __iomem *epwm1_0_map;
 #define EPWMSS0_CLK_CTRL 0xd4
 #define EPWMSS2_CLK_CTRL 0xd8
 
+#pragma warning TODO - implement more pin handlers
 #define EPWM1_0_BASE 0x48302200
 #define EPWM1_0_SZ 0x4830225f-EPWM1_0_BASE
 #define TBCNT 0x8
 #define CMPAHR 0x10
 #define TBPRD 0xa
+#define CMPA 0x12
 
 #define MF2044_IOCTL_MAGIC 0x00
 #define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
@@ -87,57 +89,17 @@ static int simple_rtdm_open_nrt(struct rtdm_dev_context *context,
  * This function is called when the device shall be closed.
  *
  */
-static int simple_rtdm_close_nrt(struct rtdm_dev_context *context,
+static int mf2044_rtdm_close_nrt(struct rtdm_dev_context *context,
 				 rtdm_user_info_t * user_info)
 {
 	return 0;
 }
-
-///**
-// * Read from the device
-// *
-// * This function is called when the device is read in non-realtime context.
-// *
-// */
-//static ssize_t simple_rtdm_read_nrt(struct rtdm_dev_context *context,
-//				    rtdm_user_info_t * user_info, void *buf,
-//				    size_t nbyte)
-//{
-//	buffer_t * buffer = (buffer_t *) context->dev_private;
-//	int size = (buffer->size > nbyte) ? nbyte : buffer->size;
-//
-//	buffer->size = 0;
-//	if (rtdm_safe_copy_to_user(user_info, buf, buffer->data, size))
-//		rtdm_printk("ERROR : can't copy data from driver\n");
-//
-//	return size;
-//}
-//
-///**
-// * Write in the device
-// *
-// * This function is called when the device is written in non-realtime context.
-// *
-// */
-//static ssize_t simple_rtdm_write_nrt(struct rtdm_dev_context *context,
-//				     rtdm_user_info_t * user_info,
-//				     const void *buf, size_t nbyte)
-//{
-//	buffer_t * buffer = (buffer_t *) context->dev_private;
-//
-//	buffer->size = (nbyte > SIZE_MAX) ? SIZE_MAX : nbyte;
-//	if (rtdm_safe_copy_from_user(user_info, buffer->data, buf, buffer->size))
-//		rtdm_printk("ERROR : can't copy data to driver\n");
-//
-//	return nbyte;
-//}
 
 static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		rtdm_user_info_t *user_info, 
 		unsigned int request, void __user *arg)
 {
 	unsigned int res=0;
-	unsigned int det;
 	switch(request)
 	{
 		case MF2044_IOCTL_ON:
@@ -145,16 +107,11 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		case MF2044_IOCTL_OFF:
 			break;
 		case MF2044_IOCTL_GET_DUTY_CYCLE:
-			res = ioread32(epwm1_0_map+CMPAHR);
+#pragma warning - need to implement more regarding CMPA / CMPB 
+			res = ioread32(epwm1_0_map+CMPA);
 			*(int*)arg = (int)res;
 			break;
 		case MF2044_IOCTL_SET_DUTY_CYCLE:
-			rtdm_printk("request - set duty cycle - %08x\n",arg);
-//			ag = (short*)2e-1;
-//			det = ioread32(epwm1_0_map+TBPRD);
-//			rtdm_printk("det - %08x\n",det);
-//			rtdm_printk("res - %08x\n",(det+1)*ag);
-//			iowrite32(((det+1))*(ag), epwm1_0_map+CMPAHR);
 			iowrite32(arg, epwm1_0_map+CMPAHR);
 			break;
 		case MF2044_IOCTL_GET_FREQUENCY:
@@ -162,15 +119,9 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			*(int*)arg = (int)res;
 			break;
 		case MF2044_IOCTL_SET_FREQUENCY:
-			rtdm_printk("request - set frequency %08x\n",arg);
-			iowrite32(arg, epwm1_0_map+TBCNT); //tbprd
+			iowrite32(arg, epwm1_0_map+TBCNT);
 			break;
 	}
-
-	det = ioread32(epwm1_0_map+CMPAHR);
-	rtdm_printk("tbprd %08x\n",det);
-	det = ioread32(epwm1_0_map+TBCNT);
-	rtdm_printk("tbcnt %08x\n",det);
 
 	return 0;
 }
@@ -189,9 +140,7 @@ static struct rtdm_device device = {
 	.open_nrt = simple_rtdm_open_nrt,
 
 	.ops = {
-		.close_nrt = simple_rtdm_close_nrt,
-//		.read_nrt = simple_rtdm_read_nrt,
-//		.write_nrt = simple_rtdm_write_nrt,
+		.close_nrt = mf2044_rtdm_close_nrt,
 		.ioctl_rt = mf2044_rtdm_ioctl_nrt,
 		.ioctl_nrt = mf2044_rtdm_ioctl_nrt,
 	},
@@ -200,7 +149,7 @@ static struct rtdm_device device = {
 	.device_sub_class = SOME_SUB_CLASS,
 	.profile_version = 1,
 	.driver_name = "mf2044_pwm",
-	.driver_version = RTDM_DRIVER_VER(0, 1, 0),
+	.driver_version = RTDM_DRIVER_VER(0, 0, 1),
 	.peripheral_name = "pwm driver for mf2044",
 	.provider_name = "Seonghyun Kim",
 	.proc_name = device.device_name,
@@ -215,7 +164,6 @@ static struct rtdm_device device = {
 int __init simple_rtdm_init(void)
 {
 	int res = -1;
-	unsigned int tbprd = -1;
 	res = rtdm_dev_register(&device);
 
 	if (0 == res) {
@@ -249,27 +197,8 @@ int __init simple_rtdm_init(void)
 	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
 	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
 
-	iowrite32(0x124f8, epwm1_0_map+CMPAHR);
-	tbprd = ioread32(epwm1_0_map+CMPAHR);
-	rtdm_printk("tbprd %08x\n",tbprd);
-
-	iowrite32(0xf424, epwm1_0_map+TBCNT);
-	tbprd = ioread32(epwm1_0_map+TBCNT);
-	rtdm_printk("tbcnt %08x\n",tbprd);
-
-	iowrite32(0xf4240000, epwm1_0_map+TBCNT); //tbprd
-	iowrite32(0x568d0000, epwm1_0_map+CMPAHR); //tbprd
-
-//	rtdm_printk("ioctl %d", MF2044_IOCTL_GET_DUTY_CYCLE);
-//	rtdm_printk("ioctl %d", MF2044_IOCTL_SET_DUTY_CYCLE);
-//
-//	if (IS_ERR(cl = class_create(THIS_MODULE,"char")))
-//		rtdm_printk("class_create failed\n");
-//	rtdm_printk("class_create\n");
-//
-//	if (IS_ERR(dev_ret = device_create(cl,NULL,dev,NULL,"zedoul")))
-//		rtdm_printk("device_create failed\n");
-//	rtdm_printk("device_create\n");
+	iowrite32(0xf4240000, epwm1_0_map+TBCNT);
+	iowrite32(0x568d0000, epwm1_0_map+CMPAHR);
 
 	return res;
 }
