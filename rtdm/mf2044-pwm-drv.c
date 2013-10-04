@@ -25,9 +25,11 @@ module_param(index,uint,0400);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Seonghyun Kim");
 
-#define SIZE_MAX		1024
+#define LSIZE_MAX		1024
 #define DEVICE_NAME		"mf2044-pwm-drv"
 #define SOME_SUB_CLASS		4711
+
+#define SYSCLK 15000000
 
 void __iomem *cm_per_map;
 void __iomem *epwm1_0_map;
@@ -40,8 +42,9 @@ void __iomem *epwm1_0_map;
 
 #define EPWM1_0_BASE 0x48302200
 #define EPWM1_0_SZ 0x4830225f-EPWM1_0_BASE
-#define TBPRD 0xa
+#define TBCNT 0x8
 #define CMPAHR 0x10
+#define TBPRD 0xa
 
 #define MF2044_IOCTL_MAGIC 0x00
 #define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
@@ -50,10 +53,6 @@ void __iomem *epwm1_0_map;
 #define MF2044_IOCTL_SET_DUTY_CYCLE _IOW(MF2044_IOCTL_MAGIC, 4, int)
 #define MF2044_IOCTL_GET_FREQUENCY _IOW(MF2044_IOCTL_MAGIC, 5, int)
 #define MF2044_IOCTL_SET_FREQUENCY _IOW(MF2044_IOCTL_MAGIC, 6, int)
-
-static dev_t dev;
-static struct device *dev_ret;
-static struct class *cl;
 
 /**
  * The context of a device instance
@@ -64,7 +63,7 @@ static struct class *cl;
  */
 typedef struct buffer_s {
 	int size;
-	char data[SIZE_MAX];
+	char data[LSIZE_MAX];
 } buffer_t;
 
 /**
@@ -94,52 +93,51 @@ static int simple_rtdm_close_nrt(struct rtdm_dev_context *context,
 	return 0;
 }
 
-/**
- * Read from the device
- *
- * This function is called when the device is read in non-realtime context.
- *
- */
-static ssize_t simple_rtdm_read_nrt(struct rtdm_dev_context *context,
-				    rtdm_user_info_t * user_info, void *buf,
-				    size_t nbyte)
-{
-	buffer_t * buffer = (buffer_t *) context->dev_private;
-	int size = (buffer->size > nbyte) ? nbyte : buffer->size;
-
-	buffer->size = 0;
-	if (rtdm_safe_copy_to_user(user_info, buf, buffer->data, size))
-		rtdm_printk("ERROR : can't copy data from driver\n");
-
-	return size;
-}
-
-/**
- * Write in the device
- *
- * This function is called when the device is written in non-realtime context.
- *
- */
-static ssize_t simple_rtdm_write_nrt(struct rtdm_dev_context *context,
-				     rtdm_user_info_t * user_info,
-				     const void *buf, size_t nbyte)
-{
-	buffer_t * buffer = (buffer_t *) context->dev_private;
-
-	buffer->size = (nbyte > SIZE_MAX) ? SIZE_MAX : nbyte;
-	if (rtdm_safe_copy_from_user(user_info, buffer->data, buf, buffer->size))
-		rtdm_printk("ERROR : can't copy data to driver\n");
-
-	return nbyte;
-}
+///**
+// * Read from the device
+// *
+// * This function is called when the device is read in non-realtime context.
+// *
+// */
+//static ssize_t simple_rtdm_read_nrt(struct rtdm_dev_context *context,
+//				    rtdm_user_info_t * user_info, void *buf,
+//				    size_t nbyte)
+//{
+//	buffer_t * buffer = (buffer_t *) context->dev_private;
+//	int size = (buffer->size > nbyte) ? nbyte : buffer->size;
+//
+//	buffer->size = 0;
+//	if (rtdm_safe_copy_to_user(user_info, buf, buffer->data, size))
+//		rtdm_printk("ERROR : can't copy data from driver\n");
+//
+//	return size;
+//}
+//
+///**
+// * Write in the device
+// *
+// * This function is called when the device is written in non-realtime context.
+// *
+// */
+//static ssize_t simple_rtdm_write_nrt(struct rtdm_dev_context *context,
+//				     rtdm_user_info_t * user_info,
+//				     const void *buf, size_t nbyte)
+//{
+//	buffer_t * buffer = (buffer_t *) context->dev_private;
+//
+//	buffer->size = (nbyte > SIZE_MAX) ? SIZE_MAX : nbyte;
+//	if (rtdm_safe_copy_from_user(user_info, buffer->data, buf, buffer->size))
+//		rtdm_printk("ERROR : can't copy data to driver\n");
+//
+//	return nbyte;
+//}
 
 static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		rtdm_user_info_t *user_info, 
 		unsigned int request, void __user *arg)
 {
 	unsigned int res=0;
-	rtdm_printk("request - %d\n",request);
-
+	unsigned int det;
 	switch(request)
 	{
 		case MF2044_IOCTL_ON:
@@ -148,17 +146,33 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			break;
 		case MF2044_IOCTL_GET_DUTY_CYCLE:
 			res = ioread32(epwm1_0_map+CMPAHR);
-			*(int *)arg = res;
+			*(int*)arg = (int)res;
 			break;
 		case MF2044_IOCTL_SET_DUTY_CYCLE:
-			iowrite32(0x568d0000, epwm1_0_map+CMPAHR); //tbprd
+			rtdm_printk("request - set duty cycle - %08x\n",arg);
+//			ag = (short*)2e-1;
+//			det = ioread32(epwm1_0_map+TBPRD);
+//			rtdm_printk("det - %08x\n",det);
+//			rtdm_printk("res - %08x\n",(det+1)*ag);
+//			iowrite32(((det+1))*(ag), epwm1_0_map+CMPAHR);
+			iowrite32(arg, epwm1_0_map+CMPAHR);
 			break;
 		case MF2044_IOCTL_GET_FREQUENCY:
+			res = ioread32(epwm1_0_map+TBPRD);
+			*(int*)arg = (int)res;
 			break;
 		case MF2044_IOCTL_SET_FREQUENCY:
-			iowrite32(0xf424, epwm1_0_map+CMPAHR); //tbprd
+			rtdm_printk("request - set frequency %08x\n",arg);
+			iowrite32(arg, epwm1_0_map+TBCNT); //tbprd
 			break;
 	}
+
+	det = ioread32(epwm1_0_map+CMPAHR);
+	rtdm_printk("tbprd %08x\n",det);
+	det = ioread32(epwm1_0_map+TBCNT);
+	rtdm_printk("tbcnt %08x\n",det);
+
+	return 0;
 }
 
 /**
@@ -238,12 +252,13 @@ int __init simple_rtdm_init(void)
 	iowrite32(0x124f8, epwm1_0_map+CMPAHR);
 	tbprd = ioread32(epwm1_0_map+CMPAHR);
 	rtdm_printk("tbprd %08x\n",tbprd);
-//
-//	iowrite32(0xf424, epwm1_0_map+TBPRD);
-//	tbprd = ioread32(epwm1_0_map+TBPRD);
-//	rtdm_printk("tbprd %08x\n",tbprd);
-//
-//	iowrite32(0x568d0000, epwm1_0_map+CMPAHR); //tbprd
+
+	iowrite32(0xf424, epwm1_0_map+TBCNT);
+	tbprd = ioread32(epwm1_0_map+TBCNT);
+	rtdm_printk("tbcnt %08x\n",tbprd);
+
+	iowrite32(0xf4240000, epwm1_0_map+TBCNT); //tbprd
+	iowrite32(0x568d0000, epwm1_0_map+CMPAHR); //tbprd
 
 //	rtdm_printk("ioctl %d", MF2044_IOCTL_GET_DUTY_CYCLE);
 //	rtdm_printk("ioctl %d", MF2044_IOCTL_SET_DUTY_CYCLE);

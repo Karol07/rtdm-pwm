@@ -22,7 +22,7 @@ int mf2044_pwm_open(void);
 int mf2044_pwm_close(void);
 int mf2044_pwm_init(MF2044_PWM_PINS pin);
 int mf2044_pwm_deinit(MF2044_PWM_PINS pin);
-int mf2044_pwm_duty_cycle_set(MF2044_PWM_PINS pin, float duty);
+int mf2044_pwm_duty_cycle_set(MF2044_PWM_PINS pin, unsigned int duty);
 int mf2044_pwm_freqency_set(MF2044_PWM_PINS pin, int freq);
 
 #endif //MF2044_PWM_LIB_H

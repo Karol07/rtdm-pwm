@@ -11,6 +11,8 @@
 
 #define DEVICE_NAME "mf2044-pwm-drv"
 
+#define SYSCLK 15000000
+
 #define MF2044_IOCTL_MAGIC 0x00
 #define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
 #define MF2044_IOCTL_OFF _IO(MF2044_IOCTL_MAGIC, 2)
@@ -55,39 +57,51 @@ int mf2044_pwm_deinit(MF2044_PWM_PINS pin)
 	return EXIT_SUCCESS;
 }
 
-float mf2044_pwm_duty_cycle_get(MF2044_PWM_PINS pin)
+int mf2044_pwm_duty_cycle_get(MF2044_PWM_PINS pin)
 {
-	float duty;
-	if (rt_dev_ioctl(fd, MF2044_IOCTL_GET_DUTY_CYCLE, duty) == -1)
+	int duty;
+	if (rt_dev_ioctl(fd, MF2044_IOCTL_GET_DUTY_CYCLE, &duty) == -1)
 	{
 		printf("TIOCMGET failed: %s\n", strerror(errno));
 		return EXIT_FAILURE;
 	}
-	printf("duty %08x\n",duty);
-	return EXIT_SUCCESS;
+	printf("get duty (((%08x)))\n",duty);
+	return duty;
 }
 
-int mf2044_pwm_duty_cycle_set(MF2044_PWM_PINS pin, float duty)
+int mf2044_pwm_duty_cycle_set(MF2044_PWM_PINS pin, unsigned int duty)
 {
-	if (rt_dev_ioctl(fd, MF2044_IOCTL_SET_DUTY_CYCLE, duty) == -1)
+	unsigned int det = 0;
+	int freq = mf2044_pwm_frequency_get(pin);
+	printf("feq %x\n", freq);
+	det = (freq + 1) * (duty * 0.01);
+	det = (unsigned int)det << (4*4);
+	printf("duty %x\n", det);
+	if (rt_dev_ioctl(fd, MF2044_IOCTL_SET_DUTY_CYCLE, det) == -1)
 		printf("TIOCMGET failed: %s\n", strerror(errno));
-	return EXIT_SUCCESS;
+	return det;
 }
 
 int mf2044_pwm_frequency_get(MF2044_PWM_PINS pin)
 {
-	if (rt_dev_ioctl(fd, MF2044_IOCTL_GET_FREQUENCY) == -1)
+	int freq;
+	if (rt_dev_ioctl(fd, MF2044_IOCTL_GET_FREQUENCY, &freq) == -1)
 	{
 		printf("TIOCMGET failed: %s\n", strerror(errno));
 		return EXIT_FAILURE;
 	}
-	return EXIT_SUCCESS;
+	printf("get freq (((%08x)))\n",freq);
+	return freq;
 }
 
-int mf2044_pwm_freqency_set(MF2044_PWM_PINS pin, int freq)
+int mf2044_pwm_frequency_set(MF2044_PWM_PINS pin, unsigned int freq)
 {
-	if (rt_dev_ioctl(fd, MF2044_IOCTL_SET_FREQUENCY, freq) == -1)
+	int det = (int)(SYSCLK / freq);
+	printf("freq %x\n", det << 16);
+	if (rt_dev_ioctl(fd, MF2044_IOCTL_SET_FREQUENCY, det << 16) == -1)
+	{
 		printf("TIOCMGET failed: %s\n", strerror(errno));
+	}
 	return EXIT_SUCCESS;
 }
 
@@ -96,9 +110,10 @@ int main()
 	float det = -1;
 	mf2044_pwm_open();
 	mf2044_pwm_init(MF2044_PWM_P9_14);
-	mf2044_pwm_duty_cycle_set(MF2044_PWM_P9_14,23.0);
-//	det = mf2044_pwm_duty_cycle_get(MF2044_PWM_P9_14);
-//	printf("duty %f\n",det);
+	mf2044_pwm_frequency_set(MF2044_PWM_P9_14,200);
+	mf2044_pwm_duty_cycle_set(MF2044_PWM_P9_14,50);
+//	mf2044_pwm_frequency_get(MF2044_PWM_P9_14);
+//	mf2044_pwm_duty_cycle_get(MF2044_PWM_P9_14);
 	mf2044_pwm_deinit(MF2044_PWM_P9_14);
 	mf2044_pwm_close();
 }
