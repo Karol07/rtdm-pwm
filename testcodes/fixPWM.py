@@ -8,13 +8,44 @@ MMAP_OFFSET = 0x44c00000                # base address of registers
 MMAP_SIZE   = 0x48ffffff-MMAP_OFFSET    # size of the register memory space
 
 CM_PER_BASE = 0x44e00000 - MMAP_OFFSET
+C_M_BASE = 0x44e10000 - MMAP_OFFSET
+
+DMTIMER1 = 0x44e31000 - MMAP_OFFSET
+DMTIMER2 = 0x48040000 - MMAP_OFFSET
+
+DMTIMER1_IRQSTATUS = DMTIMER1 + 0x28
+DMTIMER1_IRQENABLE_SET = DMTIMER1 + 0x2c
+DMTIMER2_TCRR = DMTIMER2 + 0x3c
+
+
 CM_PER_EPWMSS1_CLKCTRL = CM_PER_BASE + 0xcc
 CM_PER_EPWMSS0_CLKCTRL = CM_PER_BASE + 0xd4
 CM_PER_EPWMSS2_CLKCTRL = CM_PER_BASE + 0xd8
-PWMSS_CTRL = CM_PER_BASE + 0x664
 
+C_M_PER_GPMC_AD0 = C_M_BASE+0x800
+C_M_PER_GPMC_AD1 = C_M_BASE+0x804
+C_M_PER_GPMC_AD2 = C_M_BASE+0x808
+C_M_PER_GPMC_AD3 = C_M_BASE+0x80c
+C_M_PER_GPMC_AD4 = C_M_BASE+0x810
+C_M_PER_GPMC_AD5 = C_M_BASE+0x814
+C_M_PER_GPMC_AD6 = C_M_BASE+0x818
+C_M_PER_GPMC_AD7 = C_M_BASE+0x81c
+C_M_PER_GPMC_AD8 = C_M_BASE+0x820
+C_M_PER_GPMC_AD9 = C_M_BASE+0x824
+C_M_PER_GPMC_AD10 = C_M_BASE+0x828
+
+C_M_PER_GPMC_A2 = C_M_BASE+0x848
+
+PWMSS_CTRL = C_M_BASE + 0x664
+
+PWMSS1 = 0x48302000 - MMAP_OFFSET
 EPWM1 = 0x48302200 - MMAP_OFFSET #ePWM1, PWM Subsystem 1
 EPWM2 = 0x48304200 - MMAP_OFFSET #ePWM2, PWM Subsystem 2
+
+PWMSS1_IDVER = PWMSS1 + 0x0
+PWMSS1_SYSCONFIG = PWMSS1 + 0x4
+PWMSS1_CLKCONFIG = PWMSS1 + 0x8
+PWMSS1_CLKSTATUS = PWMSS1 + 0xc
 
 EPWM1_TBCTL = EPWM1 + 0x0 #offset 3Ch (P9_14)
 EPWM1_TBSTS = EPWM1 + 0x2
@@ -91,6 +122,35 @@ _setReg(CM_PER_EPWMSS1_CLKCTRL, 0x2)
 val = _getReg(CM_PER_EPWMSS1_CLKCTRL)
 print "Register CM_PER_EPWMSS1_CLKCTRL changed to " + hex(val)
 
+val = _getReg(CM_PER_EPWMSS0_CLKCTRL)
+print "Register CM_PER_EPWMSS0_CLKCTRL was " + hex(val)
+_setReg(CM_PER_EPWMSS0_CLKCTRL, 0x2)
+val = _getReg(CM_PER_EPWMSS0_CLKCTRL)
+print "Register CM_PER_EPWMSS0_CLKCTRL changed to " + hex(val)
+
+
+val = _getReg(CM_PER_EPWMSS2_CLKCTRL)
+print "Register CM_PER_EPWMSS2_CLKCTRL was " + hex(val)
+_setReg(CM_PER_EPWMSS2_CLKCTRL, 0x2)
+val = _getReg(CM_PER_EPWMSS2_CLKCTRL)
+print "Register CM_PER_EPWMSS2_CLKCTRL changed to " + hex(val)
+
+
+_setReg(PWMSS1_IDVER, 0x47400001)
+_setReg(PWMSS1_SYSCONFIG, 0xcc)
+_setReg(PWMSS1_CLKCONFIG, 0x111)
+_setReg(PWMSS1_CLKSTATUS, 0x111)
+
+val = _getReg(PWMSS1_IDVER)
+print "Register PWMSS1_IDVER was " + hex(val)
+val = _getReg(PWMSS1_SYSCONFIG)
+print "Register PWMSS1_SYSCONFIG was " + hex(val)
+val = _getReg(PWMSS1_CLKCONFIG)
+print "Register PWMSS1_CLKCONFIG was " + hex(val)
+val = _getReg(PWMSS1_CLKSTATUS)
+print "Register PWMSS1_CLKSTATUS was " + hex(val)
+
+
 """ Setup contermode and clock"""
 val = _getReg(PWMSS_CTRL)
 print "Register PWMSS_CTRL was " + hex(val)
@@ -100,6 +160,25 @@ print "Register PWMSS_CTRL changed to " + hex(val)
 #pwmss_ctrl PWMSS2_TBCLKEN = 1
 #pwmss_ctrl PWMSS1_TBCLKEN = 1
 #pwmss_ctrl PWMSS0_TBCLKEN = 1
+
+_setReg(C_M_PER_GPMC_AD2,0x31)
+_setReg(C_M_PER_GPMC_AD3,0x31)
+_setReg(C_M_PER_GPMC_AD4,0x31)
+_setReg(C_M_PER_GPMC_AD5,0x27)
+_setReg(C_M_PER_GPMC_AD6,0x27)
+_setReg(C_M_PER_GPMC_AD7,0x27)
+_setReg(C_M_PER_GPMC_AD8,0x27)
+_setReg(C_M_PER_GPMC_A2,0x6)
+
+print "Register C_M_PER_GPMC_AD2 was " + hex(_getReg(C_M_PER_GPMC_AD2))
+print "Register C_M_PER_GPMC_AD3 was " + hex(_getReg(C_M_PER_GPMC_AD3))
+print "Register C_M_PER_GPMC_AD4 was " + hex(_getReg(C_M_PER_GPMC_AD4))
+print "Register C_M_PER_GPMC_AD5 was " + hex(_getReg(C_M_PER_GPMC_AD5))
+print "Register C_M_PER_GPMC_AD6 was " + hex(_getReg(C_M_PER_GPMC_AD6))
+print "Register C_M_PER_GPMC_AD7 was " + hex(_getReg(C_M_PER_GPMC_AD7))
+print "Register C_M_PER_GPMC_AD8 was " + hex(_getReg(C_M_PER_GPMC_AD8))
+print "Register C_M_PER_GPMC_A2 was " + hex(_getReg(C_M_PER_GPMC_A2))
+
 
 """ Confure ehrpwm counter for up-count mode """
 val = _getReg(EPWM1_TBCTL)
@@ -129,13 +208,13 @@ print "Register EPWM1_TBPHSHR changed to " + hex(val)
 
 val = _getReg(EPWM1_TBPHS)
 print "Register EPWM1_TBPHS was " + hex(val)
-_setReg(EPWM1_TBPHS,0x2a3f0000)
+_setReg(EPWM1_TBPHS,0x99890000L)
 val = _getReg(EPWM1_TBPHS)
 print "Register EPWM1_TBPHS changed to " + hex(val)
 
 val = _getReg(EPWM1_TBCNT)
 print "Register EPWM1_TBCNT was " + hex(val)
-_setReg(EPWM1_TBCNT,0xf4242aa3L)
+_setReg(EPWM1_TBCNT,0xf4249a01L)
 val = _getReg(EPWM1_TBCNT)
 print "Register EPWM1_TBCNT was " + hex(val)
 
@@ -160,14 +239,14 @@ print "Register EPWM1_CMPCTL changed to " + hex(val)
 
 val = _getReg(EPWM1_CMPAHR)
 print "Register EPWM1_CMPAHR was " + hex(val)
-_setReg(EPWM1_CMPAHR,0x7a120000)
+_setReg(EPWM1_CMPAHR,0x5b8d0000)
 val = _getReg(EPWM1_CMPAHR)
 print "Register EPWM1_CMPAHR was " + hex(val)
 
 """ set duty cycle with CMP (p2056) """
 val = _getReg(EPWM1_CMPA)
 print "Register EPWM1_CMPA was " + hex(val)
-_setReg(EPWM1_CMPA,0x7a12)
+_setReg(EPWM1_CMPA,0x5b8d)
 val = _getReg(EPWM1_CMPA)
 print "Register EPWM1_CMPA changed to " + hex(val)
 
@@ -247,8 +326,23 @@ print "Register EPWM1_PCCTL changed to " + hex(val)
 val = _getReg(EPWM1_HRCTL)
 print "Register EPWM1_HRCTL changed to " + hex(val)
 
+""" Setup contermode and clock"""
+val = _getReg(PWMSS_CTRL)
+print "Register PWMSS_CTRL was " + hex(val)
+_setReg(PWMSS_CTRL, 0x7)
+val = _getReg(PWMSS_CTRL)
+print "Register PWMSS_CTRL changed to " + hex(val)
+#pwmss_ctrl PWMSS2_TBCLKEN = 1
+#pwmss_ctrl PWMSS1_TBCLKEN = 1
+#pwmss_ctrl PWMSS0_TBCLKEN = 1
 
-
-
-
+print "Register DMTIMER1_IRQSTATUS was " + hex(_getReg(DMTIMER1_IRQSTATUS))
+print "Register DMTIMER1_IRQENABLE_SET was " + hex(_getReg(DMTIMER1_IRQENABLE_SET))
+print "Register DMTIMER2_TCRR was " + hex(_getReg(DMTIMER2_TCRR))
+_setReg(DMTIMER1_IRQSTATUS,0xffffab9cL)
+_setReg(DMTIMER1_IRQENABLE_SET,0xffff48e5L)
+_setReg(DMTIMER2_TCRR,0x1cad9b34)
+print "Register DMTIMER1_IRQSTATUS was " + hex(_getReg(DMTIMER1_IRQSTATUS))
+print "Register DMTIMER1_IRQENABLE_SET was " + hex(_getReg(DMTIMER1_IRQENABLE_SET))
+print "Register DMTIMER2_TCRR was " + hex(_getReg(DMTIMER2_TCRR))
 
