@@ -90,6 +90,9 @@ def register_fix(node, name, value):
 	val = _getReg(node)
 	print "Register "+name+" changed to " + hex(val)
 
+
+orReg(EPWM1_TBCTL,0x1 << 3)
+
 register_fix(EPWM1_TBPRD,"PRD",0x258)
 register_fix(EPWM1_TBPHS,"PHS",0x0)
 register_fix(EPWM1_TBCNT,"CNT",0x0)
@@ -100,7 +103,7 @@ register_fix(EPWM1_TBCNT,"CNT",0x0)
 #EPWM1_TBCTL |= 0x3 << 4
 #EPWM1_TBCTL |= 0x0 << 8
 #EPWM1_TBCTL |= 0x0 << 10
-register_fix(EPWM1_TBCTL,"CTL",0x31)
+#register_fix(EPWM1_TBCTL,"CTL",0x31)
 val = _getReg(EPWM1_TBCTL)
 print "Register EPWM1_TBCTL changed to " + hex(val)
 
