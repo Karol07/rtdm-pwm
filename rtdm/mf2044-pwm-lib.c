@@ -9,17 +9,21 @@
 #include <rtdm/rtdm.h>
 #include "mf2044-pwm-lib.h"
 
-#define DEVICE_NAME "mf2044-pwm-drv"
+#define DEVICE_NAME "mf2044_pwm_drv"
 
 #define SYSCLK 15000000
 
 #define MF2044_IOCTL_MAGIC 0x00
 #define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
 #define MF2044_IOCTL_OFF _IO(MF2044_IOCTL_MAGIC, 2)
-#define MF2044_IOCTL_GET_DUTY_CYCLE _IOW(MF2044_IOCTL_MAGIC, 3, int)
-#define MF2044_IOCTL_SET_DUTY_CYCLE _IOW(MF2044_IOCTL_MAGIC, 4, int)
-#define MF2044_IOCTL_GET_FREQUENCY _IOW(MF2044_IOCTL_MAGIC, 5, int)
-#define MF2044_IOCTL_SET_FREQUENCY _IOW(MF2044_IOCTL_MAGIC, 6, int)
+#define MF2044_IOCTL_GET_DUTY_CYCLE _IO(MF2044_IOCTL_MAGIC, 3)
+#define MF2044_IOCTL_SET_DUTY_CYCLE _IO(MF2044_IOCTL_MAGIC, 4)
+#define MF2044_IOCTL_GET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 5)
+#define MF2044_IOCTL_SET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 6)
+//#define MF2044_IOCTL_GET_DUTY_CYCLE _IOW(MF2044_IOCTL_MAGIC, 3, int)
+//#define MF2044_IOCTL_SET_DUTY_CYCLE _IOW(MF2044_IOCTL_MAGIC, 4, int)
+//#define MF2044_IOCTL_GET_FREQUENCY _IOW(MF2044_IOCTL_MAGIC, 5, int)
+//#define MF2044_IOCTL_SET_FREQUENCY _IOW(MF2044_IOCTL_MAGIC, 6, int)
 
 static int fd = -1;
 
@@ -57,6 +61,9 @@ int mf2044_pwm_deinit(MF2044_PWM_PINS pin)
 int mf2044_pwm_duty_cycle_get(MF2044_PWM_PINS pin)
 {
 	int duty;
+	int command = MF2044_IOCTL_GET_DUTY_CYCLE;
+	command |= pin;
+
 	if (rt_dev_ioctl(fd, MF2044_IOCTL_GET_DUTY_CYCLE, &duty) == -1)
 	{
 		printf("TIOCMGET failed: %s\n", strerror(errno));
@@ -68,10 +75,13 @@ int mf2044_pwm_duty_cycle_get(MF2044_PWM_PINS pin)
 int mf2044_pwm_duty_cycle_set(MF2044_PWM_PINS pin, unsigned int duty)
 {
 	unsigned int det = 0;
+	int command = MF2044_IOCTL_SET_DUTY_CYCLE;
 	int freq = mf2044_pwm_frequency_get(pin);
+
+	command |= pin;
 	det = (freq + 1) * (duty * 0.01);
 	det = (unsigned int)det << (4*4);
-	if (rt_dev_ioctl(fd, MF2044_IOCTL_SET_DUTY_CYCLE, det) == -1)
+	if (rt_dev_ioctl(fd, command, det) == -1)
 		printf("TIOCMGET failed: %s\n", strerror(errno));
 	return det;
 }
@@ -79,7 +89,10 @@ int mf2044_pwm_duty_cycle_set(MF2044_PWM_PINS pin, unsigned int duty)
 int mf2044_pwm_frequency_get(MF2044_PWM_PINS pin)
 {
 	int freq;
-	if (rt_dev_ioctl(fd, MF2044_IOCTL_GET_FREQUENCY, &freq) == -1)
+	int command = MF2044_IOCTL_GET_FREQUENCY;
+	command |= pin;
+
+	if (rt_dev_ioctl(fd, command, &freq) == -1)
 	{
 		printf("TIOCMGET failed: %s\n", strerror(errno));
 		return EXIT_FAILURE;
@@ -90,7 +103,10 @@ int mf2044_pwm_frequency_get(MF2044_PWM_PINS pin)
 int mf2044_pwm_frequency_set(MF2044_PWM_PINS pin, unsigned int freq)
 {
 	int det = (int)(SYSCLK / freq);
-	if (rt_dev_ioctl(fd, MF2044_IOCTL_SET_FREQUENCY, det << 16) == -1)
+	int command = MF2044_IOCTL_SET_FREQUENCY;
+	command |= pin;
+
+	if (rt_dev_ioctl(fd, command, det << 16) == -1)
 	{
 		printf("TIOCMGET failed: %s\n", strerror(errno));
 	}
@@ -102,10 +118,21 @@ int main()
 	float det = -1;
 	mf2044_pwm_open();
 	mf2044_pwm_init(MF2044_PWM_P9_14);
+
+	// Ch 0
 	mf2044_pwm_frequency_set(MF2044_PWM_P9_14,200);
 	mf2044_pwm_duty_cycle_set(MF2044_PWM_P9_14,50);
-//	mf2044_pwm_frequency_get(MF2044_PWM_P9_14);
-//	mf2044_pwm_duty_cycle_get(MF2044_PWM_P9_14);
+
+	mf2044_pwm_frequency_set(MF2044_PWM_P8_19,100);
+	mf2044_pwm_duty_cycle_set(MF2044_PWM_P8_19,25);
+
+	// Ch 1
+	mf2044_pwm_frequency_set(MF2044_PWM_P9_16,100);
+	mf2044_pwm_duty_cycle_set(MF2044_PWM_P9_16,25);
+
+	mf2044_pwm_frequency_set(MF2044_PWM_P8_13,100);
+	mf2044_pwm_duty_cycle_set(MF2044_PWM_P8_13,25);
+
 	mf2044_pwm_deinit(MF2044_PWM_P9_14);
 	mf2044_pwm_close();
 }

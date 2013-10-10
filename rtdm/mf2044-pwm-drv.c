@@ -26,13 +26,18 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Seonghyun Kim");
 
 #define LSIZE_MAX		1024
-#define DEVICE_NAME		"mf2044-pwm-drv"
+#define DEVICE_NAME		"mf2044_pwm_drv"
 #define SOME_SUB_CLASS		4711
 
 #define SYSCLK 15000000
 
 void __iomem *cm_per_map;
 void __iomem *epwm1_0_map;
+void __iomem *epwm1_1_map;
+void __iomem *epwm0_0_map;
+void __iomem *epwm0_1_map;
+void __iomem *epwm2_0_map;
+void __iomem *epwm2_1_map;
 
 #define CM_PER_BASE 0x44e00000
 #define CM_PER_SZ 0x44e03fff-CM_PER_BASE
@@ -42,19 +47,33 @@ void __iomem *epwm1_0_map;
 
 #pragma warning TODO - implement more pin handlers
 #define EPWM1_0_BASE 0x48302200
-#define EPWM1_0_SZ 0x4830225f-EPWM1_0_BASE
+#define EPWM1_1_BASE 0x48302260
+#define EPWM0_0_BASE 0x48300200
+#define EPWM0_1_BASE 0x48300260
+#define EPWM2_0_BASE 0x48304200
+#define EPWM2_1_BASE 0x48304260
+
+#define EPWM_SZ 0x5f
+
 #define TBCNT 0x8
 #define CMPAHR 0x10
 #define TBPRD 0xa
 #define CMPA 0x12
 
+#define MF2044_PWM_1_0 1 << 4 //P9.14
+#define MF2044_PWM_1_1 1 << 5 //P9.16
+#define MF2044_PWM_0_0 1 << 6 //?
+#define MF2044_PWM_0_1 1 << 7 //?
+#define MF2044_PWM_2_0 1 << 8 //P8.19
+#define MF2044_PWM_2_1 1 << 9 //P8.13
+
 #define MF2044_IOCTL_MAGIC 0x00
 #define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
 #define MF2044_IOCTL_OFF _IO(MF2044_IOCTL_MAGIC, 2)
-#define MF2044_IOCTL_GET_DUTY_CYCLE _IOW(MF2044_IOCTL_MAGIC, 3, int)
-#define MF2044_IOCTL_SET_DUTY_CYCLE _IOW(MF2044_IOCTL_MAGIC, 4, int)
-#define MF2044_IOCTL_GET_FREQUENCY _IOW(MF2044_IOCTL_MAGIC, 5, int)
-#define MF2044_IOCTL_SET_FREQUENCY _IOW(MF2044_IOCTL_MAGIC, 6, int)
+#define MF2044_IOCTL_GET_DUTY_CYCLE _IO(MF2044_IOCTL_MAGIC, 3)
+#define MF2044_IOCTL_SET_DUTY_CYCLE _IO(MF2044_IOCTL_MAGIC, 4)
+#define MF2044_IOCTL_GET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 5)
+#define MF2044_IOCTL_SET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 6)
 
 /**
  * The context of a device instance
@@ -100,6 +119,40 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		unsigned int request, void __user *arg)
 {
 	unsigned int res=0;
+	void __iomem *target;
+
+	rtdm_printk("%s %d - before %x\n", __func__, __LINE__, request);
+//	rtdm_printk("%s %d - %x\n", __func__, __LINE__, MF2044_PWM_1_0);
+//	rtdm_printk("%s %d - %x\n", __func__, __LINE__, ~(MF2044_PWM_1_0));
+
+	if (request & MF2044_PWM_1_0) {
+		rtdm_printk("P9.14\n");
+		target = epwm1_0_map;
+		request &= ~(MF2044_PWM_1_0);
+	} else if (request & MF2044_PWM_1_1) {
+		rtdm_printk("P9.16\n");
+		target = epwm1_1_map;
+		request &= ~(MF2044_PWM_1_1);
+	} else if (request & MF2044_PWM_0_0) {
+		rtdm_printk("P??\n");
+		target = epwm0_0_map;
+		request &= ~(MF2044_PWM_0_0);
+	} else if (request & MF2044_PWM_0_1) {
+		rtdm_printk("P??\n");
+		target = epwm0_1_map;
+		request &= ~(MF2044_PWM_0_1);
+	} else if (request & MF2044_PWM_2_0) {
+		rtdm_printk("P8.19\n");
+		target = epwm2_0_map;
+		request &= ~(MF2044_PWM_2_0);
+	} else if (request & MF2044_PWM_2_1) {
+		rtdm_printk("P8.13\n");
+		target = epwm2_1_map;
+		request &= ~(MF2044_PWM_2_1);
+	}
+
+	rtdm_printk("command 0x%x\n", request);
+
 	switch(request)
 	{
 		case MF2044_IOCTL_ON:
@@ -108,18 +161,18 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			break;
 		case MF2044_IOCTL_GET_DUTY_CYCLE:
 #pragma warning - need to implement more regarding CMPA / CMPB 
-			res = ioread32(epwm1_0_map+CMPA);
+			res = ioread32(target+CMPA);
 			*(int*)arg = (int)res;
 			break;
 		case MF2044_IOCTL_SET_DUTY_CYCLE:
-			iowrite32(arg, epwm1_0_map+CMPAHR);
+			iowrite32(arg, target+CMPAHR);
 			break;
 		case MF2044_IOCTL_GET_FREQUENCY:
-			res = ioread32(epwm1_0_map+TBPRD);
+			res = ioread32(target+TBPRD);
 			*(int*)arg = (int)res;
 			break;
 		case MF2044_IOCTL_SET_FREQUENCY:
-			iowrite32(arg, epwm1_0_map+TBCNT);
+			iowrite32(arg, target+TBCNT);
 			break;
 	}
 
@@ -148,7 +201,7 @@ static struct rtdm_device device = {
 	.device_class = RTDM_CLASS_EXPERIMENTAL,
 	.device_sub_class = SOME_SUB_CLASS,
 	.profile_version = 1,
-	.driver_name = "mf2044_pwm",
+	.driver_name = DEVICE_NAME,
 	.driver_version = RTDM_DRIVER_VER(0, 0, 1),
 	.peripheral_name = "pwm driver for mf2044",
 	.provider_name = "Seonghyun Kim",
@@ -191,7 +244,12 @@ int __init simple_rtdm_init(void)
 		rtdm_printk("\n");
 	}
 	cm_per_map = ioremap(CM_PER_BASE,CM_PER_SZ);
-	epwm1_0_map = ioremap(EPWM1_0_BASE,EPWM1_0_SZ);
+	epwm1_0_map = ioremap(EPWM1_0_BASE,EPWM_SZ);
+	epwm1_1_map = ioremap(EPWM1_1_BASE,EPWM_SZ);
+	epwm0_0_map = ioremap(EPWM0_0_BASE,EPWM_SZ);
+	epwm0_1_map = ioremap(EPWM0_1_BASE,EPWM_SZ);
+	epwm2_0_map = ioremap(EPWM2_0_BASE,EPWM_SZ);
+	epwm2_1_map = ioremap(EPWM2_1_BASE,EPWM_SZ);
 
 	iowrite32(0x2, cm_per_map+EPWMSS1_CLK_CTRL);
 	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);

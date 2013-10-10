@@ -44,7 +44,7 @@ LDFLAGS+=-Xlinker -rpath -Xlinker $(shell $(XENOCONFIG) --libdir)
 all:: $(APPLICATIONS)
 
 clean::
-	$(RM) $(APPLICATIONS) *.o
+	$(RM) $(APPLICATIONS) *.o *.so
 
 endif
 endif
