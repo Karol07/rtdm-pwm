@@ -1,11 +1,11 @@
 ###### CONFIGURATION ######
 
-### List of applications to be build
-APPLICATIONS = mf2044-pwm-app mf2044-pwm-lib
-
 ### LIst of libraries to be build
-#LIBRARIES = mf2044-pwm-lib 
+LIBRARIES = mf2044-pwm-lib 
 ### Note: to override the search path for the xeno-config script, use "make XENO=..."
+
+### List of applications to be build
+APPLICATIONS = mf2044-pwm-app #mf2044-pwm-lib
 
 ### List of modules to be build
 MODULES = mf2044-pwm-drv 
@@ -41,7 +41,23 @@ LDLIBS=$(shell $(XENOCONFIG) --skin=native --ldflags) \
 # easier for beginners if Xenomai's libs are not in any default search path.
 LDFLAGS+=-Xlinker -rpath -Xlinker $(shell $(XENOCONFIG) --libdir)
 
-all:: $(APPLICATIONS)
+
+
+ifneq ($(LIBRARIES),)
+all::
+	$(CC) -c mf2044-pwm-lib.c $(CFLAGS) $(LDFLAGS)
+	ar cr ./libmf2044-pwm-lib.a ./mf2044-pwm-lib.o
+#	$(CC) mf2044-pwm-lib.o -shared -o libmf2044-pwm-lib.so
+clean::
+	$(RM) $(LIBRARIES) *.so
+
+endif
+
+
+all:: 
+#$(APPLICATIONS)
+	$(CC) -c mf2044-pwm-app.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o app mf2044-pwm-app.c -L. -lmf2044-pwm-lib $(CFLAGS) $(LDFLAGS)
 
 clean::
 	$(RM) $(APPLICATIONS) *.o *.so
@@ -49,15 +65,6 @@ clean::
 endif
 endif
 
-
-#ifneq ($(LIBRARIES),)
-#all::
-#	$(CC) -c -fPIC mf2044-pwm-lib.c -o mf2044-pwm-lib.o $(CFLAGS) $(LDFLAGS)
-#	$(CC) mf2044-pwm-lib.o -shared -o libmf2044-pwm-lib.so
-#clean::
-#	$(RM) $(LIBRARIES) *.so
-#
-#endif
 
 ###### KERNEL MODULE BUILD (no change required normally) ######
 ifneq ($(MODULES),)
