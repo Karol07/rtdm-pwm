@@ -1,15 +1,16 @@
 ###### CONFIGURATION ######
 
+
+### List of modules to be build
+MODULES = mf2044-pwm-drv 
+
+
 ### LIst of libraries to be build
 LIBRARIES = mf2044-pwm-lib 
 ### Note: to override the search path for the xeno-config script, use "make XENO=..."
 
 ### List of applications to be build
 APPLICATIONS = mf2044-pwm-app #mf2044-pwm-lib
-
-### List of modules to be build
-MODULES = mf2044-pwm-drv 
-
 ### Note: to override the kernel source path, use "make KSRC=..."
 
 ###### USER SPACE BUILD (no change required normally) ######
@@ -68,7 +69,7 @@ else
 ARCH    ?= $(shell uname -i)
 INCLUDE := -I$(KSRC)/include/xenomai -I$(KSRC)/include/xenomai/compat -I$(KSRC)/include/xenomai/posix
 CFLAGS  += $(shell $(MAKE) -s -C $(KSRC) CC=$(CC) ARCH=$(ARCH) SUBDIRS=$(PWD) modules) $(INCLUDE)
-
+ 
 all:: $(OBJS)
 
 endif

@@ -62,8 +62,8 @@ void __iomem *epwm2_1_map;
 
 #define MF2044_PWM_1_0 1 << 4 //P9.14
 #define MF2044_PWM_1_1 1 << 5 //P9.16
-#define MF2044_PWM_0_0 1 << 6 //?
-#define MF2044_PWM_0_1 1 << 7 //?
+#define MF2044_PWM_0_0 1 << 6 //P9.22
+#define MF2044_PWM_0_1 1 << 7 //P9.21
 #define MF2044_PWM_2_0 1 << 8 //P8.19
 #define MF2044_PWM_2_1 1 << 9 //P8.13
 
@@ -121,43 +121,49 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 	unsigned int res=0;
 	void __iomem *target;
 
-	rtdm_printk("%s %d - before %x\n", __func__, __LINE__, request);
+//	rtdm_printk("%s %d - before %x\n", __func__, __LINE__, request);
 //	rtdm_printk("%s %d - %x\n", __func__, __LINE__, MF2044_PWM_1_0);
 //	rtdm_printk("%s %d - %x\n", __func__, __LINE__, ~(MF2044_PWM_1_0));
 
 	if (request & MF2044_PWM_1_0) {
-		rtdm_printk("P9.14\n");
+//		rtdm_printk("P9.14\n");
 		target = epwm1_0_map;
 		request &= ~(MF2044_PWM_1_0);
 	} else if (request & MF2044_PWM_1_1) {
-		rtdm_printk("P9.16\n");
+//		rtdm_printk("P9.16\n");
 		target = epwm1_1_map;
 		request &= ~(MF2044_PWM_1_1);
 	} else if (request & MF2044_PWM_0_0) {
-		rtdm_printk("P??\n");
+//		rtdm_printk("P9.22\n");
 		target = epwm0_0_map;
 		request &= ~(MF2044_PWM_0_0);
 	} else if (request & MF2044_PWM_0_1) {
-		rtdm_printk("P??\n");
+//		rtdm_printk("P9.21\n");
 		target = epwm0_1_map;
 		request &= ~(MF2044_PWM_0_1);
 	} else if (request & MF2044_PWM_2_0) {
-		rtdm_printk("P8.19\n");
+//		rtdm_printk("P8.19\n");
 		target = epwm2_0_map;
 		request &= ~(MF2044_PWM_2_0);
 	} else if (request & MF2044_PWM_2_1) {
-		rtdm_printk("P8.13\n");
+//		rtdm_printk("P8.13\n");
 		target = epwm2_1_map;
 		request &= ~(MF2044_PWM_2_1);
 	}
 
-	rtdm_printk("command 0x%x\n", request);
+//	rtdm_printk("command 0x%x\n", request);
 
 	switch(request)
 	{
 		case MF2044_IOCTL_ON:
+			iowrite32(0x2, cm_per_map+EPWMSS1_CLK_CTRL);
+			iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
+			iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
 			break;
 		case MF2044_IOCTL_OFF:
+			iowrite32(0x0, cm_per_map+EPWMSS1_CLK_CTRL);
+			iowrite32(0x0, cm_per_map+EPWMSS0_CLK_CTRL);
+			iowrite32(0x0, cm_per_map+EPWMSS2_CLK_CTRL);
 			break;
 		case MF2044_IOCTL_GET_DUTY_CYCLE:
 #pragma warning - need to implement more regarding CMPA / CMPB 
@@ -269,9 +275,9 @@ int __init simple_rtdm_init(void)
  */
 void __exit simple_rtdm_exit(void)
 {
-	iowrite32(0x0, cm_per_map+0xcc);
-	iowrite32(0x0, cm_per_map+0xd4);
-	iowrite32(0x0, cm_per_map+0xd8);
+	iowrite32(0x0, cm_per_map+EPWMSS1_CLK_CTRL);
+	iowrite32(0x0, cm_per_map+EPWMSS0_CLK_CTRL);
+	iowrite32(0x0, cm_per_map+EPWMSS2_CLK_CTRL);
 
 	rtdm_dev_unregister(&device, 1000);
 }

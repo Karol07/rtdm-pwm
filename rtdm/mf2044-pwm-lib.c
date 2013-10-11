@@ -20,10 +20,6 @@
 #define MF2044_IOCTL_SET_DUTY_CYCLE _IO(MF2044_IOCTL_MAGIC, 4)
 #define MF2044_IOCTL_GET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 5)
 #define MF2044_IOCTL_SET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 6)
-//#define MF2044_IOCTL_GET_DUTY_CYCLE _IOW(MF2044_IOCTL_MAGIC, 3, int)
-//#define MF2044_IOCTL_SET_DUTY_CYCLE _IOW(MF2044_IOCTL_MAGIC, 4, int)
-//#define MF2044_IOCTL_GET_FREQUENCY _IOW(MF2044_IOCTL_MAGIC, 5, int)
-//#define MF2044_IOCTL_SET_FREQUENCY _IOW(MF2044_IOCTL_MAGIC, 6, int)
 
 static int fd = -1;
 
@@ -112,28 +108,3 @@ int mf2044_pwm_frequency_set(MF2044_PWM_PINS pin, unsigned int freq)
 	}
 	return EXIT_SUCCESS;
 }
-
-//int main()
-//{
-//	float det = -1;
-//	mf2044_pwm_open();
-//	mf2044_pwm_init(MF2044_PWM_P9_14);
-//
-//	// Ch 0
-//	mf2044_pwm_frequency_set(MF2044_PWM_P9_14,200);
-//	mf2044_pwm_duty_cycle_set(MF2044_PWM_P9_14,50);
-//
-//	mf2044_pwm_frequency_set(MF2044_PWM_P8_19,100);
-//	mf2044_pwm_duty_cycle_set(MF2044_PWM_P8_19,25);
-//
-//	// Ch 1
-//	mf2044_pwm_frequency_set(MF2044_PWM_P9_16,100);
-//	mf2044_pwm_duty_cycle_set(MF2044_PWM_P9_16,25);
-//
-//	mf2044_pwm_frequency_set(MF2044_PWM_P8_13,100);
-//	mf2044_pwm_duty_cycle_set(MF2044_PWM_P8_13,25);
-//
-//	mf2044_pwm_deinit(MF2044_PWM_P9_14);
-//	mf2044_pwm_close();
-//}
-

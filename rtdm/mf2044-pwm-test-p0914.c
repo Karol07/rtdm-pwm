@@ -10,8 +10,8 @@ int main(int argc, char** argv)
 {
 	// P8_19
 	int param_opt;
-	int freq = 0;
-	int duty = 0;
+	int freq = 100;
+	int duty = 50;
 	opterr = 0;
 	while (-1 != (param_opt = getopt(argc, argv, "f:od:o")))
 	{
@@ -39,6 +39,12 @@ int main(int argc, char** argv)
 
 	mf2044_pwm_frequency_set(MF2044_PWM_P9_14,freq);
 	mf2044_pwm_duty_cycle_set(MF2044_PWM_P9_14,duty);
+
+	unsigned int df = mf2044_pwm_frequency_get(MF2044_PWM_P9_14);
+	unsigned int du = mf2044_pwm_duty_cycle_get(MF2044_PWM_P9_14);
+
+	printf("freq %d 0x%x\n", df, df);
+	printf("duty %d 0x%x\n", du, du);
 
 	mf2044_pwm_deinit(MF2044_PWM_P9_14);
 	mf2044_pwm_close();
