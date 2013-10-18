@@ -1,17 +1,16 @@
 ###### CONFIGURATION ######
 
-### List of applications to be build
-#APPLICATIONS = mf2044-pwm-lib
-
-### Note: to override the search path for the xeno-config script, use "make XENO=..."
-
 
 ### List of modules to be build
-MODULES = mf2044-pwm-drv
+MODULES = mf2044-pwm-drv 
 
+### LIst of libraries to be build
+LIBRARIES = mf2044-pwm-lib 
+### Note: to override the search path for the xeno-config script, use "make XENO=..."
+
+### List of applications to be build
+APPLICATIONS = mf2044-pwm-pwm-test-p0819 #mf2044-pwm-lib
 ### Note: to override the kernel source path, use "make KSRC=..."
-
-
 
 ###### USER SPACE BUILD (no change required normally) ######
 ifeq ($(KERNELRELEASE),)
@@ -42,18 +41,10 @@ LDLIBS=$(shell $(XENOCONFIG) --skin=native --ldflags) \
 # easier for beginners if Xenomai's libs are not in any default search path.
 LDFLAGS+=-Xlinker -rpath -Xlinker $(shell $(XENOCONFIG) --libdir)
 
-all:: $(APPLICATIONS)
-
-clean::
-	$(RM) $(APPLICATIONS) *.o
-
-endif
-endif
-
-
-
 ###### KERNEL MODULE BUILD (no change required normally) ######
 ifneq ($(MODULES),)
+
+$(info ">>> modules <<<")
 
 ### Default to sources of currently running kernel
 KSRC ?= /lib/modules/$(shell uname -r)/build
@@ -66,6 +57,7 @@ PWD      := $(shell if [ "$$PWD" != "" ]; then echo $$PWD; else pwd; fi)
 PATCHLEVEL:=$(shell sed 's/PATCHLEVEL = \(.*\)/\1/;t;d' $(KSRC)/Makefile)
 VERSION:=$(shell sed 's/VERSION = \(.*\)/\1/;t;d' $(KSRC)/Makefile)
 ifneq ($(VERSION).$(PATCHLEVEL),2.4)
+$(info ">>> kernel under 2.4 <<<")
 
 obj-m        := $(OBJS)
 EXTRA_CFLAGS := -I$(KSRC)/include/xenomai -I$(KSRC)/include/xenomai/posix $(ADD_CFLAGS)
@@ -75,11 +67,12 @@ all::
 
 ### Kernel 2.4
 else
+$(info ">>> kernel 2.4 above <<<")
 
 ARCH    ?= $(shell uname -i)
-INCLUDE := -I$(KSRC)/include/xenomai -I$(KSRC)/include/xenomai/compat -I$(KSRC)/include/xenomai/posix
+INCLUDE := -I$(KSRC)/include/ -I$(KSRC)/include/xenomai -I$(KSRC)/include/xenomai/compat -I$(KSRC)/include/xenomai/posix
 CFLAGS  += $(shell $(MAKE) -s -C $(KSRC) CC=$(CC) ARCH=$(ARCH) SUBDIRS=$(PWD) modules) $(INCLUDE)
-
+ 
 all:: $(OBJS)
 
 endif
@@ -93,3 +86,27 @@ clean::
 	$(RM) -R .tmp*
 
 endif
+
+
+ifneq ($(LIBRARIES),)
+all::
+	$(CC) -c -fPIC mf2044-pwm-lib.c -o mf2044-pwm-lib.o  $(CFLAGS) $(LDFLAGS)
+	$(CC) mf2044-pwm-lib.o -shared -o libmf2044-pwm-lib.so $(CFLAGS) $(LDFLAGS)
+clean::
+	$(RM) $(LIBRARIES) *.so
+
+endif
+
+all:: 
+#$(APPLICATIONS)
+	$(CC) -c mf2044-pwm-test-p0819.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -c mf2044-pwm-test-p0914.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o test-p0819 mf2044-pwm-test-p0819.o $(CFLAGS) $(LDFLAGS) -L. -lmf2044-pwm-lib -lrtdm -lxenomai -g -O0
+	$(CC) -o test-p0914 mf2044-pwm-test-p0914.o $(CFLAGS) $(LDFLAGS) -L. -lmf2044-pwm-lib -lrtdm -lxenomai -g -O0
+
+clean::
+	$(RM) $(APPLICATIONS) *.o *.so test-p0819 test-p0914
+
+endif
+endif
+

@@ -75,6 +75,14 @@ void __iomem *epwm2_1_map;
 #define MF2044_IOCTL_GET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 5)
 #define MF2044_IOCTL_SET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 6)
 
+static int pin=MF2044_PWM_1_0;
+static int freq=1000;
+static int duty=50;
+//MODULE_PARAM(pin,"p")
+//MODULE_PARAM(freq,"f")
+//MODULE_PARAM(duty,"d")
+
+
 /**
  * The context of a device instance
  *
@@ -223,6 +231,9 @@ static struct rtdm_device device = {
 int __init simple_rtdm_init(void)
 {
 	int res = -1;
+	int request_command =0;
+	int request_value =0;
+
 	res = rtdm_dev_register(&device);
 
 	if (0 == res) {
@@ -261,8 +272,19 @@ int __init simple_rtdm_init(void)
 	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
 	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
 
-	iowrite32(0xf4240000, epwm1_0_map+TBCNT);
-	iowrite32(0x568d0000, epwm1_0_map+CMPAHR);
+//	iowrite32(0xf4240000, epwm1_0_map+TBCNT);
+//	iowrite32(0x568d0000, epwm1_0_map+CMPAHR);
+
+	request_command = MF2044_IOCTL_GET_FREQUENCY;
+	request_command |= pin;
+	request_value = freq<<16;
+	mf2044_rtdm_ioctl_nrt(NULL,NULL,request_command,request_value);
+
+	request_command = MF2044_IOCTL_GET_DUTY_CYCLE;
+	request_command |= pin;
+	request_value = (freq + 1) * (duty * 0.01);
+	request_value = (unsigned int)request_value << (4*4);
+	mf2044_rtdm_ioctl_nrt(NULL,NULL,request_command,request_value);
 
 	return res;
 }
