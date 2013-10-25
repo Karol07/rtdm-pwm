@@ -11,6 +11,7 @@
 
 #include <rtdm/rtdm_driver.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/platform_device.h>
 #include <linux/pwm.h>
 #include <linux/slab.h>
@@ -20,8 +21,6 @@
 #include <linux/pm_runtime.h>
 #include <linux/pinctrl/consumer.h>
 
-static unsigned int index;
-module_param(index,uint,0400);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Seonghyun Kim");
 
@@ -78,10 +77,9 @@ void __iomem *epwm2_1_map;
 static int pin=MF2044_PWM_1_0;
 static int freq=1000;
 static int duty=50;
-//MODULE_PARAM(pin,"p")
-//MODULE_PARAM(freq,"f")
-//MODULE_PARAM(duty,"d")
 
+int init_param_array[3];
+compat_module_param_array(init_param_array,int,NULL,0);
 
 /**
  * The context of a device instance
@@ -132,60 +130,66 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 //	rtdm_printk("%s %d - before %x\n", __func__, __LINE__, request);
 //	rtdm_printk("%s %d - %x\n", __func__, __LINE__, MF2044_PWM_1_0);
 //	rtdm_printk("%s %d - %x\n", __func__, __LINE__, ~(MF2044_PWM_1_0));
+	target = epwm1_0_map;
 
 	if (request & MF2044_PWM_1_0) {
-//		rtdm_printk("P9.14\n");
+		rtdm_printk("P9.14\n");
 		target = epwm1_0_map;
 		request &= ~(MF2044_PWM_1_0);
 	} else if (request & MF2044_PWM_1_1) {
-//		rtdm_printk("P9.16\n");
+		rtdm_printk("P9.16\n");
 		target = epwm1_1_map;
 		request &= ~(MF2044_PWM_1_1);
 	} else if (request & MF2044_PWM_0_0) {
-//		rtdm_printk("P9.22\n");
+		rtdm_printk("P9.22\n");
 		target = epwm0_0_map;
 		request &= ~(MF2044_PWM_0_0);
 	} else if (request & MF2044_PWM_0_1) {
-//		rtdm_printk("P9.21\n");
+		rtdm_printk("P9.21\n");
 		target = epwm0_1_map;
 		request &= ~(MF2044_PWM_0_1);
 	} else if (request & MF2044_PWM_2_0) {
-//		rtdm_printk("P8.19\n");
+		rtdm_printk("P8.19\n");
 		target = epwm2_0_map;
 		request &= ~(MF2044_PWM_2_0);
 	} else if (request & MF2044_PWM_2_1) {
-//		rtdm_printk("P8.13\n");
+		rtdm_printk("P8.13\n");
 		target = epwm2_1_map;
 		request &= ~(MF2044_PWM_2_1);
 	}
 
 //	rtdm_printk("command 0x%x\n", request);
-
 	switch(request)
 	{
 		case MF2044_IOCTL_ON:
+			rtdm_printk("MF2044_IOCTL_ON\n");
 			iowrite32(0x2, cm_per_map+EPWMSS1_CLK_CTRL);
 			iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
 			iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
 			break;
 		case MF2044_IOCTL_OFF:
+			rtdm_printk("MF2044_IOCTL_OFF\n");
 			iowrite32(0x0, cm_per_map+EPWMSS1_CLK_CTRL);
 			iowrite32(0x0, cm_per_map+EPWMSS0_CLK_CTRL);
 			iowrite32(0x0, cm_per_map+EPWMSS2_CLK_CTRL);
 			break;
 		case MF2044_IOCTL_GET_DUTY_CYCLE:
 #pragma warning - need to implement more regarding CMPA / CMPB 
+			rtdm_printk("MF2044_IOCTL_GET_DUTY_CYCLE\n");
 			res = ioread32(target+CMPA);
 			*(int*)arg = (int)res;
 			break;
 		case MF2044_IOCTL_SET_DUTY_CYCLE:
+			rtdm_printk("MF2044_IOCTL_SET_DUTY_CYCLE [%x]\n",arg);
 			iowrite32(arg, target+CMPAHR);
 			break;
 		case MF2044_IOCTL_GET_FREQUENCY:
+			rtdm_printk("MF2044_IOCTL_GET_FREQUENCY\n");
 			res = ioread32(target+TBPRD);
 			*(int*)arg = (int)res;
 			break;
 		case MF2044_IOCTL_SET_FREQUENCY:
+			rtdm_printk("MF2044_IOCTL_SET_FREQUENCY [%x]\n",arg);
 			iowrite32(arg, target+TBCNT);
 			break;
 	}
@@ -234,6 +238,17 @@ int __init simple_rtdm_init(void)
 	int request_command =0;
 	int request_value =0;
 
+	int pin_ = (int) init_param_array[0];
+	int freq_ = (int) init_param_array[1];
+	int duty_ = (int) init_param_array[2];
+
+	pin_ = 1<<4;
+	freq_ = 300;
+	duty_ = 50;
+	rtdm_printk("pin %d\n", pin_);
+	rtdm_printk("freq %d\n", freq_);
+	rtdm_printk("duty %d\n", duty_);
+
 	res = rtdm_dev_register(&device);
 
 	if (0 == res) {
@@ -272,19 +287,23 @@ int __init simple_rtdm_init(void)
 	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
 	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
 
-//	iowrite32(0xf4240000, epwm1_0_map+TBCNT);
-//	iowrite32(0x568d0000, epwm1_0_map+CMPAHR);
+	iowrite32(0xf4240000, epwm1_0_map+TBCNT);
+	iowrite32(0x568d0000, epwm1_0_map+CMPAHR);
 
-	request_command = MF2044_IOCTL_GET_FREQUENCY;
-	request_command |= pin;
-	request_value = freq<<16;
-	mf2044_rtdm_ioctl_nrt(NULL,NULL,request_command,request_value);
+//	iowrite32(0x24f80000, epwm1_0_map+TBCNT);
+//	iowrite32(0x127c0000, epwm1_0_map+CMPAHR);
 
-	request_command = MF2044_IOCTL_GET_DUTY_CYCLE;
-	request_command |= pin;
-	request_value = (freq + 1) * (duty * 0.01);
-	request_value = (unsigned int)request_value << (4*4);
-	mf2044_rtdm_ioctl_nrt(NULL,NULL,request_command,request_value);
+
+//	request_command = MF2044_IOCTL_SET_FREQUENCY;
+//	request_command |= pin;
+//	request_value = (15000000/freq)<<16;
+//	mf2044_rtdm_ioctl_nrt(NULL,NULL,request_command,request_value);
+//
+//	request_command = MF2044_IOCTL_SET_DUTY_CYCLE;
+//	request_command |= pin;
+//	request_value = (freq + 1) * (duty * 0.01);
+//	request_value = (unsigned int)request_value << (4*4);
+//	mf2044_rtdm_ioctl_nrt(NULL,NULL,request_command,request_value);
 
 	return res;
 }
