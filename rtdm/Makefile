@@ -2,20 +2,17 @@
 
 ### List of applications to be build
 #APPLICATIONS = mf2044-pwm-lib
-
 ### Note: to override the search path for the xeno-config script, use "make XENO=..."
-
 
 ### List of modules to be build
 MODULES = mf2044-pwm-drv
+#LIBRARIES = mf2044-pwm-lib 
 
 ### Note: to override the kernel source path, use "make KSRC=..."
 
-
-
 ###### USER SPACE BUILD (no change required normally) ######
 ifeq ($(KERNELRELEASE),)
-ifneq ($(APPLICATIONS),)
+#ifneq ($(APPLICATIONS),)
 
 ### Default Xenomai installation path
 XENO ?= /usr/xenomai
@@ -42,14 +39,29 @@ LDLIBS=$(shell $(XENOCONFIG) --skin=native --ldflags) \
 # easier for beginners if Xenomai's libs are not in any default search path.
 LDFLAGS+=-Xlinker -rpath -Xlinker $(shell $(XENOCONFIG) --libdir)
 
-all:: $(APPLICATIONS)
+#all:: $(APPLICATIONS)
+all:: 
+	$(CC) -c -fPIC mf2044-pwm-lib.c -o mf2044-pwm-lib.o  $(CFLAGS) $(LDFLAGS) $(LDLIBS)
+	$(CC) mf2044-pwm-lib.o -shared -o libmf2044-pwm-lib.so $(CFLAGS) $(LDFLAGS) $(LDLIBS)
+	$(CC) -c mf2044-pwm-test-p0819.c $(CFLAGS) $(LDFLAGS) $(LDLIBS)
+	$(CC) -c mf2044-pwm-test-p0914.c $(CFLAGS) $(LDFLAGS) $(LDLIBS)
+	$(CC) -o test-p0819 mf2044-pwm-test-p0819.o $(CFLAGS) $(LDFLAGS) $(LDLIBS) -L. -lmf2044-pwm-lib -lrtdm -lxenomai -g -O0
+	$(CC) -o test-p0914 mf2044-pwm-test-p0914.o $(CFLAGS) $(LDFLAGS) $(LDLIBS) -L. -lmf2044-pwm-lib -lrtdm -lxenomai -g -O0
 
 clean::
 	$(RM) $(APPLICATIONS) *.o
 
-endif
+#endif
 endif
 
+ifneq ($(LIBRARIES),)
+all::
+	$(CC) -c -fPIC mf2044-pwm-lib.c -o mf2044-pwm-lib.o $(CFLAGS) $(LDFLAGS)
+	$(CC) mf2044-pwm-lib.o -shared -o libmf2044-pwm-lib.so
+clean::
+	$(RM) $(LIBRARIES) *.so
+
+endif
 
 
 ###### KERNEL MODULE BUILD (no change required normally) ######
