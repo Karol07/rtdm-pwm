@@ -60,6 +60,8 @@ all::
 	$(CC) mf2044-pwm-lib.o -shared -o libmf2044-pwm-lib.so
 clean::
 	$(RM) $(LIBRARIES) *.so
+	$(RM) libmf2044-pwm-lib.so
+	$(RM) test-p0819 test-p0914
 
 endif
 
@@ -103,5 +105,8 @@ modules:
 clean::
 	$(RM) $(CLEANMOD) *.o *.ko *.mod.c Module*.symvers Module.markers modules.order
 	$(RM) -R .tmp*
+	$(RM) $(LIBRARIES) *.so
+	$(RM) libmf2044-pwm-lib.so
+	$(RM) test-p0819 test-p0914
 
 endif

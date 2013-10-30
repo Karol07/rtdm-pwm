@@ -46,7 +46,7 @@ int main(int argc, char** argv)
 	printf("freq %d 0x%x\n", df, df);
 	printf("duty %d 0x%x\n", du, du);
 
-	mf2044_pwm_deinit(MF2044_PWM_P9_14);
-	mf2044_pwm_close();
+//	mf2044_pwm_deinit(MF2044_PWM_P9_14);
+//	mf2044_pwm_close();
 }
 
