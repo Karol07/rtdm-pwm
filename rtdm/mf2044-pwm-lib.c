@@ -11,7 +11,7 @@
 
 #define DEVICE_NAME "mf2044_pwm_drv"
 
-#define SYSCLK 15000000
+#define SYSCLK 50000000
 
 #define MF2044_IOCTL_MAGIC 0x00
 #define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
@@ -72,10 +72,10 @@ int mf2044_pwm_duty_cycle_set(MF2044_PWM_PINS pin, unsigned int duty)
 {
 	unsigned int det = 0;
 	int command = MF2044_IOCTL_SET_DUTY_CYCLE;
-	int freq = mf2044_pwm_frequency_get(pin);
+	int tbprd = mf2044_pwm_frequency_get(pin);
 
 	command |= pin;
-	det = (freq + 1) * (duty * 0.01);
+	det = (tbprd + 1) * (duty * 0.01);
 	det = (unsigned int)det << (4*4);
 	if (rt_dev_ioctl(fd, command, det) == -1)
 		printf("TIOCMGET failed: %s\n", strerror(errno));

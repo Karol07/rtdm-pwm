@@ -1,43 +1,17 @@
 --- ./50_1000.log	2013-10-03 13:07:56.933540514 +0200
 +++ ./50_800.log	2013-10-03 13:07:56.933540514 +0200
 @@ -47,15 +47,15 @@
- Register EQEP1_QDECCTL was 0x0
- Register EQEP1_QEPCTL was 0x0
- Register PWMSS_CTRL was 0x7
 -Register EPWM1_TBCTL was 0x5c080
 -Register EPWM1_TBSTS was 0x5
 +Register EPWM1_TBCTL was 0x1c080
 +Register EPWM1_TBSTS was 0x1
- Register EPWM1_TBPHSHR was 0x0
 -Register EPWM1_TBPHS was 0xaffc0000L
 -Register EPWM1_TBCNT was 0xc350b72fL
 -Register EPWM1_TBPRD was 0xc350
 +Register EPWM1_TBPHS was 0x61330000
 +Register EPWM1_TBCNT was 0xf424673aL
 +Register EPWM1_TBPRD was 0xf424
- Register EPWM1_CMPCTL was 0x0
--Register EPWM1_CMPAHR was 0x61a80000
--Register EPWM1_CMPA was 0x61a8
-+Register EPWM1_CMPAHR was 0x7a120000
-+Register EPWM1_CMPA was 0x7a12
- Register EPWM1_CMPB was 0x250000
- Register EPWM1_AQCTLA was 0x25
- Register EPWM1_AQCTLB was 0x0
-@@ -95,7 +95,7 @@
- Register TIOCP_CONFIG was 0x30c
- Register IRQ was 0x2
- Register IRQ was 0x1
 -Register IRQ was 0xffff7e9fL
 +Register IRQ was 0xffff5f8cL
- Register IRQ was 0xffff48e5L
- Register IRQ was 0xffffffffL
- Register IRQ was 0x0
-@@ -117,7 +117,7 @@
- Register IRQ was 0x0
- Register IRQ was 0x0
- Register TCLR was 0x3
 -Register TCRR was 0xe0c689cfL
 +Register TCRR was 0x6c59ce37
- Register TLDR was 0x0
- Register TTGR was 0xffffffffL
- Register TWPS was 0x0
