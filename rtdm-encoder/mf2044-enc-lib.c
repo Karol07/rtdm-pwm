@@ -9,10 +9,7 @@
 #include <rtdm/rtdm.h>
 #include "mf2044-enc-lib.h"
 
-#define DEVICE_NAME "mf2044_enc_drv"
-
-#define SYSCLK 50000000
-
+#define DEVICE_NAME		"mf2044_enc_drv"
 #define MF2044_IOCTL_MAGIC 0x00
 #define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
 #define MF2044_IOCTL_OFF _IO(MF2044_IOCTL_MAGIC, 2)
@@ -67,7 +64,7 @@ int mf2044_enc_mode_set(MF2044_ENC_PINS pin, MF2044_ENC_MODES mode)
 
 uint64_t mf2044_enc_period_get(MF2044_ENC_PINS pin)
 {
-	int ret;
+	uint64_t ret;
 	int command = MF2044_IOCTL_GET_PERIOD;
 	command |= pin;
 
@@ -87,6 +84,7 @@ int mf2044_enc_period_set(MF2044_ENC_PINS pin, uint64_t period)
 	if (rt_dev_ioctl(fd, command, period) == -1)
 	{
 		printf("TIOCMGET failed: %s\n", strerror(errno));
+		return EXIT_FAILURE;
 	}
 	return EXIT_SUCCESS;
 }

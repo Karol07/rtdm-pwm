@@ -23,15 +23,16 @@
 #include <linux/interrupt.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/input.h>
+#include "../../../linux-dev/KERNEL/drivers/pwm/pwm-tipwmss.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Seonghyun Kim");
 
 #define LSIZE_MAX		1024
-#define DEVICE_NAME		"mf2044-enc-drv"
+#define DEVICE_NAME		"mf2044_enc_drv"
 #define SOME_SUB_CLASS		4711
 
-#define SYSCLK 15000000
+//#define SYSCLK 15000000
 
 #define CM_PER_BASE 0x44e00000
 #define CM_PER_SZ 0x44e03fff-CM_PER_BASE
@@ -43,8 +44,7 @@ MODULE_AUTHOR("Seonghyun Kim");
 #define EQEP0_BASE 0x48300180
 #define EQEP1_BASE 0x48302180
 #define EQEP2_BASE 0x48304180
-
-#define EPWM_SZ 0x5f
+#define EQEP_SZ 0x7f
 
 #define TBCNT 0x8
 #define CMPAHR 0x10
@@ -59,7 +59,15 @@ MODULE_AUTHOR("Seonghyun Kim");
 #define MF2044_MODE_RELATIVE 1
 
 int mode = MF2044_MODE_ABSOLUTE;
-void __iomem *mmio_base = EQEP0_BASE;
+
+void __iomem *cm_per_map;
+void __iomem *eqep0_map;
+void __iomem *eqep1_map;
+void __iomem *eqep2_map;
+
+void __iomem *mmio_base; //eqep0_map;
+
+u64 clk_rate = 0;
 
 #define MF2044_IOCTL_MAGIC 0x00
 #define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
@@ -209,15 +217,34 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		unsigned int request, void __user *arg)
 {
 	unsigned int res=0;
-	void __iomem *target;
 	int position = 0;
 	int rc;
 	u16 tmp;
 	u64 period;
+	struct clk       *clk;
+//	u32 clk_rate = clk_get_rate(clk);
+	mmio_base = eqep0_map;
+	rtdm_printk("ioctl!\n");
+	rtdm_printk("clk_rate [%d]\n", (int)clk_rate);
+
+	if (request & MF2044_ENC_0) {
+		rtdm_printk("ENC 0\n");
+		mmio_base = eqep0_map;
+		request &= ~(MF2044_ENC_0);
+	} else if (request & MF2044_ENC_1) {
+		rtdm_printk("ENC 1\n");
+		mmio_base = eqep1_map;
+		request &= ~(MF2044_ENC_1);
+	} else if (request & MF2044_ENC_2) {
+		rtdm_printk("ENC 2\n");
+		mmio_base = eqep2_map;
+		request &= ~(MF2044_ENC_2);
+	}
 
 	switch (request)
 	{
 		case MF2044_IOCTL_GET_POSITION:
+			rtdm_printk("get position\n");
 			if (mode == MF2044_MODE_ABSOLUTE)
 				position = readl(mmio_base + QPOSCNT);
 			else
@@ -225,20 +252,22 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			*(int*)arg = position;
 			break;
 		case MF2044_IOCTL_GET_PERIOD:
+			rtdm_printk("get period\n");
 			if(!(readw(mmio_base + QEPCTL) & UTE))
 			{
-				*(int*)arg=0;
+				*(uint64_t*)arg=0;
 				return 0;
 			}
 			period = readl(mmio_base + QUPRD);
+			rtdm_printk("period [%llu] with [%llu]\n", (uint64_t)period, (uint64_t)NSEC_PER_SEC);
+
 			period = period * NSEC_PER_SEC;
-			do_div(period, SYSCLK);
-			*(int*)arg = position;
+			do_div(period, clk_rate);
+			*(uint64_t*)arg = period;
 			break;
 		case MF2044_IOCTL_SET_PERIOD:
-//			if((rc = kstrtou64(buf, 0, &period)))
-//				return rc;
-			period = (int)arg;
+			rtdm_printk("set period\n");
+			period = (u64)arg;
 			// Disable the unit timer before modifying its period register
 			tmp = readw(mmio_base + QEPCTL);
 			tmp = tmp & ~UTE & ~QCLM;
@@ -247,8 +276,9 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			writel(0x0, mmio_base + QUTMR);
 			if(period)
 			{
+				rtdm_printk("- period [%llu]\n",period);
 				// Otherwise calculate the period
-				period = period * SYSCLK;
+				period = period * clk_rate;
 				do_div(period, NSEC_PER_SEC);
 				// Set this period into the unit timer period register
 				writel(period & 0x00000000FFFFFFFF, mmio_base + QUPRD);
@@ -262,7 +292,7 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			*(int*)arg = mode;
 			break;
 		case MF2044_IOCTL_SET_MODE:
-			*(int*)arg = mode;
+			mode = (int)arg;
 			break;
 
 	}
@@ -280,20 +310,49 @@ static int simple_rtdm_open_nrt(struct rtdm_dev_context *context,
 {
 	struct resource  *r;
 	struct clk       *clk;
-//	struct eqep_chip *eqep;
+	//	struct eqep_chip *eqep;
 	struct pinctrl   *pinctrl;
 	int               ret;
 	u64               period;
 	u16               status;
 	u8                value;
+//	clk_rate = clk_get_rate(clk);
 
+	rtdm_printk("PWM driver opened without errors!\n");
+	rtdm_printk("clk_rate [%d]\n", (int)clk_rate);
+
+	// Read decoder control settings
+	status = readw(mmio_base + QDECCTL);
+
+	status = ((value) ? status | QSRC0 : status & ~QSRC0) & ~QSRC1;
+	status = status & ~QAP;
+	status = status & ~QBP;
+	status = (value) ? status | QIP : status & ~QIP;
+	status = (value) ? status | QSP : status & ~QSP;
+	status = (value) ? status | SWAP : status & ~SWAP;
+
+	// Initialize the position counter to zero
 	writel(0, mmio_base + QPOSINIT);
+
+	// This is pretty ingenious if I do say so myself.  The eQEP subsystem has a register
+	// that defined the maximum value of the encoder as an unsigned.  If the counter is zero
+	// and decrements again, it is set to QPOSMAX.  If you cast -1 (signed int) to
+	// to an unsigned, you will notice that -1 == UINT_MAX.  So when the counter is set to this
+	// maximum position, when read into a signed int, it will equal -1.  Two's complement for 
+	// the WIN!!
 	writel(-1, mmio_base + QPOSMAX);
+
+	// Enable some interrupts
+	status = readw(mmio_base + QEINT);
+	status = status | UTOF;
+	// UTOF - Unit Time Period interrupt.  This is triggered when the unit timer period expires
+	// 
 	writew(status, mmio_base + QEINT);
 
 	// Calculate the timer ticks per second
 	period = 1000000000;
-	period = period * SYSCLK;
+	period = period * clk_rate;
+	rtdm_printk("period [%llu] with [%llu]\n", (uint64_t)period, (uint64_t)NSEC_PER_SEC);
 	do_div(period, NSEC_PER_SEC);
 
 	// Set this period into the unit timer period register
@@ -309,6 +368,15 @@ static int simple_rtdm_open_nrt(struct rtdm_dev_context *context,
 	// QCLM - latch QPOSLAT to QPOSCNT upon unit timer overflow
 	writew(status, mmio_base + QEPCTL);
 
+//    status = pwmss_submodule_state_change(pdev->dev.parent, PWMSS_EQEPCLK_EN);
+//    // If we failed to enable the clocks, fail out
+//    if (!(status & PWMSS_EQEPCLK_EN_ACK)) 
+//    {
+//        dev_err(&pdev->dev, "PWMSS config space clock enable failed\n");
+//        ret = -EINVAL;
+//    }
+
+	return 0;
 }
 
 /**
@@ -363,11 +431,12 @@ int __init simple_rtdm_init(void)
 	int res = -1;
 	int request_command =0;
 	int request_value =0;
+	struct clk       *clk;
 
 	res = rtdm_dev_register(&device);
 
 	if (0 == res) {
-		rtdm_printk("PWM driver registered without errors\n");
+		rtdm_printk("PWM driver registered without errors!\n");
 	} else {
 		rtdm_printk("PWM driver registration failed: \n");
 		switch(res) {
@@ -390,6 +459,21 @@ int __init simple_rtdm_init(void)
 		}
 		rtdm_printk("\n");
 	}
+
+	cm_per_map = ioremap(CM_PER_BASE,CM_PER_SZ);
+	mmio_base = ioremap(EQEP0_BASE,EQEP_SZ);
+	eqep0_map = ioremap(EQEP0_BASE,EQEP_SZ);
+	eqep1_map = ioremap(EQEP1_BASE,EQEP_SZ);
+	eqep2_map = ioremap(EQEP2_BASE,EQEP_SZ);
+
+	iowrite32(0x2, cm_per_map+EPWMSS1_CLK_CTRL);
+	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
+	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
+
+//	clk = devm_clk_get();
+//	clk_rate = clk_get_rate(clk);
+	clk_rate = rtdm_clock_read();
+	rtdm_printk("clk_rate [%d]\n", (int)clk_rate);
 
 	return res;
 }
