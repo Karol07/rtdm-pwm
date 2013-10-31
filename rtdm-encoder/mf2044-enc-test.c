@@ -20,8 +20,8 @@ int main(int argc, char** argv)
 	period = mf2044_enc_period_get(pin);
 	printf ("[eQEP] Period = %llu ns\n",period);
 
-//	position = mf2044_enc_position_get(pin);
-//	printf ("[eQEP] Position = [%ld]\n",position);
+	position = mf2044_enc_position_get(pin);
+	printf ("[eQEP] Position = [%ld]\n",position);
 
 	return 0;
 }

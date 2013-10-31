@@ -91,11 +91,12 @@ int mf2044_enc_period_set(MF2044_ENC_PINS pin, uint64_t period)
 
 int32_t mf2044_enc_position_get(MF2044_ENC_PINS pin)
 {
-	unsigned int det = 0;
+	uint32_t det = 0;
 	int command = MF2044_IOCTL_GET_POSITION;
 	command |= pin;
-	if (rt_dev_ioctl(fd, command, det) == -1)
+	if (rt_dev_ioctl(fd, command, &det) == -1)
 		printf("TIOCMGET failed: %s\n", strerror(errno));
+	printf("pos %d\n",det);
 	return det;
 }
 

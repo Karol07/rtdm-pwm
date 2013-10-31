@@ -32,7 +32,7 @@ MODULE_AUTHOR("Seonghyun Kim");
 #define DEVICE_NAME		"mf2044_enc_drv"
 #define SOME_SUB_CLASS		4711
 
-//#define SYSCLK 15000000
+#define SYSCLK 15000000
 
 #define CM_PER_BASE 0x44e00000
 #define CM_PER_SZ 0x44e03fff-CM_PER_BASE
@@ -217,26 +217,21 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		unsigned int request, void __user *arg)
 {
 	unsigned int res=0;
-	int position = 0;
+	int32_t position = 0;
 	int rc;
 	u16 tmp;
 	u64 period;
 	struct clk       *clk;
 //	u32 clk_rate = clk_get_rate(clk);
 	mmio_base = eqep0_map;
-	rtdm_printk("ioctl!\n");
-	rtdm_printk("clk_rate [%d]\n", (int)clk_rate);
 
 	if (request & MF2044_ENC_0) {
-		rtdm_printk("ENC 0\n");
 		mmio_base = eqep0_map;
 		request &= ~(MF2044_ENC_0);
 	} else if (request & MF2044_ENC_1) {
-		rtdm_printk("ENC 1\n");
 		mmio_base = eqep1_map;
 		request &= ~(MF2044_ENC_1);
 	} else if (request & MF2044_ENC_2) {
-		rtdm_printk("ENC 2\n");
 		mmio_base = eqep2_map;
 		request &= ~(MF2044_ENC_2);
 	}
@@ -244,29 +239,25 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 	switch (request)
 	{
 		case MF2044_IOCTL_GET_POSITION:
-			rtdm_printk("get position\n");
-			if (mode == MF2044_MODE_ABSOLUTE)
+			if (mode == MF2044_MODE_ABSOLUTE) {
 				position = readl(mmio_base + QPOSCNT);
-			else
+			} else {
 				position = readl(mmio_base + QPOSLAT);
-			*(int*)arg = position;
+			}
+			*(int32_t*)arg = position;
 			break;
 		case MF2044_IOCTL_GET_PERIOD:
-			rtdm_printk("get period\n");
 			if(!(readw(mmio_base + QEPCTL) & UTE))
 			{
 				*(uint64_t*)arg=0;
 				return 0;
 			}
 			period = readl(mmio_base + QUPRD);
-			rtdm_printk("period [%llu] with [%llu]\n", (uint64_t)period, (uint64_t)NSEC_PER_SEC);
-
 			period = period * NSEC_PER_SEC;
 			do_div(period, clk_rate);
 			*(uint64_t*)arg = period;
 			break;
 		case MF2044_IOCTL_SET_PERIOD:
-			rtdm_printk("set period\n");
 			period = (u64)arg;
 			// Disable the unit timer before modifying its period register
 			tmp = readw(mmio_base + QEPCTL);
@@ -276,7 +267,6 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			writel(0x0, mmio_base + QUTMR);
 			if(period)
 			{
-				rtdm_printk("- period [%llu]\n",period);
 				// Otherwise calculate the period
 				period = period * clk_rate;
 				do_div(period, NSEC_PER_SEC);
@@ -316,10 +306,6 @@ static int simple_rtdm_open_nrt(struct rtdm_dev_context *context,
 	u64               period;
 	u16               status;
 	u8                value;
-//	clk_rate = clk_get_rate(clk);
-
-	rtdm_printk("PWM driver opened without errors!\n");
-	rtdm_printk("clk_rate [%d]\n", (int)clk_rate);
 
 	// Read decoder control settings
 	status = readw(mmio_base + QDECCTL);
@@ -352,7 +338,6 @@ static int simple_rtdm_open_nrt(struct rtdm_dev_context *context,
 	// Calculate the timer ticks per second
 	period = 1000000000;
 	period = period * clk_rate;
-	rtdm_printk("period [%llu] with [%llu]\n", (uint64_t)period, (uint64_t)NSEC_PER_SEC);
 	do_div(period, NSEC_PER_SEC);
 
 	// Set this period into the unit timer period register
@@ -472,7 +457,7 @@ int __init simple_rtdm_init(void)
 
 //	clk = devm_clk_get();
 //	clk_rate = clk_get_rate(clk);
-	clk_rate = rtdm_clock_read();
+	clk_rate = SYSCLK;
 	rtdm_printk("clk_rate [%d]\n", (int)clk_rate);
 
 	return res;
