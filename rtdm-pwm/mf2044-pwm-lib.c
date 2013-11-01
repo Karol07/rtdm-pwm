@@ -68,18 +68,16 @@ int mf2044_pwm_duty_cycle_get(MF2044_PWM_PINS pin)
 	return duty;
 }
 
-int mf2044_pwm_duty_cycle_set(MF2044_PWM_PINS pin, unsigned int duty)
+int mf2044_pwm_duty_cycle_set(MF2044_PWM_PINS pin, int duty)
 {
-	unsigned int det = 0;
-	int command = MF2044_IOCTL_SET_DUTY_CYCLE;
-	int tbprd = mf2044_pwm_frequency_get(pin);
+	printf("asf duty [%d]\n", duty);
 
+	int command = MF2044_IOCTL_SET_DUTY_CYCLE;
 	command |= pin;
-	det = (tbprd + 1) * (duty * 0.01);
-	det = (unsigned int)det << (4*4);
-	if (rt_dev_ioctl(fd, command, det) == -1)
+	printf("asf duty [%d]\n", duty);
+	if (rt_dev_ioctl(fd, command, duty) == -1)
 		printf("TIOCMGET failed: %s\n", strerror(errno));
-	return det;
+	return EXIT_SUCCESS;
 }
 
 int mf2044_pwm_frequency_get(MF2044_PWM_PINS pin)
@@ -96,13 +94,12 @@ int mf2044_pwm_frequency_get(MF2044_PWM_PINS pin)
 	return freq;
 }
 
-int mf2044_pwm_frequency_set(MF2044_PWM_PINS pin, unsigned int freq)
+int mf2044_pwm_frequency_set(MF2044_PWM_PINS pin, int freq)
 {
-	int det = (int)(SYSCLK / freq);
 	int command = MF2044_IOCTL_SET_FREQUENCY;
 	command |= pin;
 
-	if (rt_dev_ioctl(fd, command, det << 16) == -1)
+	if (rt_dev_ioctl(fd, command, freq) == -1)
 	{
 		printf("TIOCMGET failed: %s\n", strerror(errno));
 	}
