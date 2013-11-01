@@ -32,7 +32,7 @@ MODULE_AUTHOR("Seonghyun Kim");
 #define DEVICE_NAME		"mf2044_enc_drv"
 #define SOME_SUB_CLASS		4711
 
-#define SYSCLK 15000000
+#define SYSCLK 100000000
 
 #define CM_PER_BASE 0x44e00000
 #define CM_PER_SZ 0x44e03fff-CM_PER_BASE
@@ -67,7 +67,7 @@ void __iomem *eqep2_map;
 
 void __iomem *mmio_base; //eqep0_map;
 
-u64 clk_rate = 0;
+u64 clk_rate = SYSCLK;
 
 #define MF2044_IOCTL_MAGIC 0x00
 #define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
@@ -458,7 +458,7 @@ int __init simple_rtdm_init(void)
 //	clk = devm_clk_get();
 //	clk_rate = clk_get_rate(clk);
 	clk_rate = SYSCLK;
-	rtdm_printk("clk_rate [%d]\n", (int)clk_rate);
+	rtdm_printk("clk_rate [%llu]\n", (u64)clk_rate);
 
 	return res;
 }

@@ -28,7 +28,7 @@ MODULE_AUTHOR("Seonghyun Kim");
 #define DEVICE_NAME		"mf2044_pwm_drv"
 #define SOME_SUB_CLASS		4711
 
-#define SYSCLK 15000000
+#define SYSCLK 100000000
 
 void __iomem *cm_per_map;
 void __iomem *epwm1_0_map;
@@ -56,8 +56,96 @@ void __iomem *epwm2_1_map;
 
 #define TBCNT 0x8
 #define CMPAHR 0x10
-#define TBPRD 0xa
-#define CMPA 0x12
+//#define TBPRD 0xa
+//#define CMPA 0x12
+
+
+/* EHRPWM registers and bits definitions */
+/* Time base module registers */
+#define TBCTL			0x00
+#define TBPRD			0x0A
+
+#define TBCTL_RUN_MASK		(BIT(15) | BIT(14))
+#define TBCTL_STOP_NEXT		0
+#define TBCTL_STOP_ON_CYCLE	BIT(14)
+#define TBCTL_FREE_RUN		(BIT(15) | BIT(14))
+#define TBCTL_PRDLD_MASK	BIT(3)
+#define TBCTL_PRDLD_SHDW	0
+#define TBCTL_PRDLD_IMDT	BIT(3)
+#define TBCTL_CLKDIV_MASK	(BIT(12) | BIT(11) | BIT(10) | BIT(9) | \
+				BIT(8) | BIT(7))
+#define TBCTL_CTRMODE_MASK	(BIT(1) | BIT(0))
+#define TBCTL_CTRMODE_UP	0
+#define TBCTL_CTRMODE_DOWN	BIT(0)
+#define TBCTL_CTRMODE_UPDOWN	BIT(1)
+#define TBCTL_CTRMODE_FREEZE	(BIT(1) | BIT(0))
+
+#define TBCTL_HSPCLKDIV_SHIFT	7
+#define TBCTL_CLKDIV_SHIFT	10
+
+#define CLKDIV_MAX		7
+#define HSPCLKDIV_MAX		7
+#define PERIOD_MAX		0xFFFF
+
+/* compare module registers */
+#define CMPA			0x12
+#define CMPB			0x14
+
+/* Action qualifier module registers */
+#define AQCTLA			0x16
+#define AQCTLB			0x18
+#define AQSFRC			0x1A
+#define AQCSFRC			0x1C
+
+#define AQCTL_CBU_MASK		(BIT(9) | BIT(8))
+#define AQCTL_CBU_FRCLOW	BIT(8)
+#define AQCTL_CBU_FRCHIGH	BIT(9)
+#define AQCTL_CBU_FRCTOGGLE	(BIT(9) | BIT(8))
+#define AQCTL_CAU_MASK		(BIT(5) | BIT(4))
+#define AQCTL_CAU_FRCLOW	BIT(4)
+#define AQCTL_CAU_FRCHIGH	BIT(5)
+#define AQCTL_CAU_FRCTOGGLE	(BIT(5) | BIT(4))
+#define AQCTL_PRD_MASK		(BIT(3) | BIT(2))
+#define AQCTL_PRD_FRCLOW	BIT(2)
+#define AQCTL_PRD_FRCHIGH	BIT(3)
+#define AQCTL_PRD_FRCTOGGLE	(BIT(3) | BIT(2))
+#define AQCTL_ZRO_MASK		(BIT(1) | BIT(0))
+#define AQCTL_ZRO_FRCLOW	BIT(0)
+#define AQCTL_ZRO_FRCHIGH	BIT(1)
+#define AQCTL_ZRO_FRCTOGGLE	(BIT(1) | BIT(0))
+
+#define AQCTL_CHANA_POLNORMAL	(AQCTL_CAU_FRCLOW | AQCTL_PRD_FRCHIGH | \
+				AQCTL_ZRO_FRCHIGH)
+#define AQCTL_CHANA_POLINVERSED	(AQCTL_CAU_FRCHIGH | AQCTL_PRD_FRCLOW | \
+				AQCTL_ZRO_FRCLOW)
+#define AQCTL_CHANB_POLNORMAL	(AQCTL_CBU_FRCLOW | AQCTL_PRD_FRCHIGH | \
+				AQCTL_ZRO_FRCHIGH)
+#define AQCTL_CHANB_POLINVERSED	(AQCTL_CBU_FRCHIGH | AQCTL_PRD_FRCLOW | \
+				AQCTL_ZRO_FRCLOW)
+
+#define AQSFRC_RLDCSF_MASK	(BIT(7) | BIT(6))
+#define AQSFRC_RLDCSF_ZRO	0
+#define AQSFRC_RLDCSF_PRD	BIT(6)
+#define AQSFRC_RLDCSF_ZROPRD	BIT(7)
+#define AQSFRC_RLDCSF_IMDT	(BIT(7) | BIT(6))
+
+#define AQCSFRC_CSFB_MASK	(BIT(3) | BIT(2))
+#define AQCSFRC_CSFB_FRCDIS	0
+#define AQCSFRC_CSFB_FRCLOW	BIT(2)
+#define AQCSFRC_CSFB_FRCHIGH	BIT(3)
+#define AQCSFRC_CSFB_DISSWFRC	(BIT(3) | BIT(2))
+#define AQCSFRC_CSFA_MASK	(BIT(1) | BIT(0))
+#define AQCSFRC_CSFA_FRCDIS	0
+#define AQCSFRC_CSFA_FRCLOW	BIT(0)
+#define AQCSFRC_CSFA_FRCHIGH	BIT(1)
+#define AQCSFRC_CSFA_DISSWFRC	(BIT(1) | BIT(0))
+
+#define NUM_PWM_CHANNEL		2	/* EHRPWM channels */
+
+
+
+
+
 
 #define MF2044_PWM_1_0 1 << 4 //P9.14
 #define MF2044_PWM_1_1 1 << 5 //P9.16
@@ -92,6 +180,59 @@ typedef struct buffer_s {
 	int size;
 	char data[LSIZE_MAX];
 } buffer_t;
+
+/**
+ * set_prescale_div -	Set up the prescaler divider function
+ * @rqst_prescaler:	prescaler value min
+ * @prescale_div:	prescaler value set
+ * @tb_clk_div:		Time Base Control prescaler bits
+ */
+static int set_prescale_div(unsigned long rqst_prescaler,
+		unsigned short *prescale_div, unsigned short *tb_clk_div)
+{
+	unsigned int clkdiv, hspclkdiv;
+
+	for (clkdiv = 0; clkdiv <= CLKDIV_MAX; clkdiv++) {
+		for (hspclkdiv = 0; hspclkdiv <= HSPCLKDIV_MAX; hspclkdiv++) {
+
+			/*
+			 * calculations for prescaler value :
+			 * prescale_div = HSPCLKDIVIDER * CLKDIVIDER.
+			 * HSPCLKDIVIDER =  2 ** hspclkdiv
+			 * CLKDIVIDER = (1),		if clkdiv == 0 *OR*
+			 *		(2 * clkdiv),	if clkdiv != 0
+			 *
+			 * Configure prescale_div value such that period
+			 * register value is less than 65535.
+			 */
+
+			*prescale_div = (1 << clkdiv) *
+					(hspclkdiv ? (hspclkdiv * 2) : 1);
+			if (*prescale_div > rqst_prescaler) {
+				*tb_clk_div = (clkdiv << TBCTL_CLKDIV_SHIFT) |
+					(hspclkdiv << TBCTL_HSPCLKDIV_SHIFT);
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
+static void ehrpwm_write(void *base, int offset, unsigned int val)
+{
+	writew(val & 0xFFFF, base + offset);
+}
+
+static void ehrpwm_modify(void *base, int offset,
+		unsigned short mask, unsigned short val)
+{
+	unsigned short regval;
+
+	regval = readw(base + offset);
+	regval &= ~mask;
+	regval |= val & mask;
+	writew(regval, base + offset);
+}
 
 /**
  * Open the device
@@ -232,11 +373,17 @@ static struct rtdm_device device = {
  * It simply registers the RTDM device.
  *
  */
+
 int __init simple_rtdm_init(void)
 {
 	int res = -1;
 	int request_command =0;
 	int request_value =0;
+
+	unsigned long period_cycles, duty_cycles;
+	unsigned short ps_divval, tb_divval;
+	unsigned short aqcsfrc_val, aqcsfrc_mask;
+	unsigned long long c;
 
 	int pin_ = (int) pm_init[0];
 	int freq_ = (int) pm_init[1];
@@ -244,11 +391,18 @@ int __init simple_rtdm_init(void)
 	unsigned int tbprd = -1;
 
 	pin_ = 1<<4;
-//	freq_ = 300;
-//	duty_ = 50;
+	freq_ = 300;
+	duty_ = 50;
 	rtdm_printk("pin %d\n", pin_);
 	rtdm_printk("freq %d\n", freq_);
 	rtdm_printk("duty %d\n", duty_);
+
+	period_cycles = 30000000;
+	duty_cycles   = 15000000;
+	rtdm_printk( "1.Period cycles : %lu\n",period_cycles);
+	rtdm_printk( "2.Duty cycles : %lu\n",duty_cycles);
+	rtdm_printk( "NSEC_PER_SEC : %d\n",NSEC_PER_SEC);
+
 
 	res = rtdm_dev_register(&device);
 
@@ -295,14 +449,68 @@ int __init simple_rtdm_init(void)
 
 	request_command = MF2044_IOCTL_SET_FREQUENCY;
 	request_command |= pin;
-	request_value = ((int)(SYSCLK/freq))<<16;
-	mf2044_rtdm_ioctl_nrt(NULL,NULL,request_command,request_value);
+//	request_value = ((int)(SYSCLK/freq))<<16;
+//	mf2044_rtdm_ioctl_nrt(NULL,NULL,request_command,request_value);
 
-	request_command = MF2044_IOCTL_SET_DUTY_CYCLE;
-	request_command |= pin;
-	request_value = (((int)(SYSCLK/freq)) + 1) * (duty * 0.01);
-	request_value = (unsigned int)request_value << (4*4);
-	mf2044_rtdm_ioctl_nrt(NULL,NULL,request_command,request_value);
+	/* Changes to shadow mode */
+	ehrpwm_modify(epwm1_0_map, AQSFRC, AQSFRC_RLDCSF_MASK,
+			AQSFRC_RLDCSF_ZRO);
+	aqcsfrc_val = AQCSFRC_CSFA_FRCDIS;
+	aqcsfrc_mask = AQCSFRC_CSFA_MASK;
+	ehrpwm_modify(epwm1_0_map, AQCSFRC, aqcsfrc_mask, aqcsfrc_val);
+
+	rtdm_printk("start\n");
+
+	/* Enable time counter for free_run */
+	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_RUN_MASK, TBCTL_FREE_RUN);
+
+	c = SYSCLK;
+	c = (c * period_cycles);
+	do_div(c, NSEC_PER_SEC);
+	period_cycles = (unsigned long) c;
+
+	c = SYSCLK;
+	c = (c * duty_cycles);
+	do_div(c, NSEC_PER_SEC);
+	duty_cycles = (unsigned long) c;
+
+	rtdm_printk( "1.Period cycles : %lu\n",period_cycles);
+	rtdm_printk( "2.Duty cycles : %lu\n",duty_cycles);
+
+	/* Configure clock prescaler to support Low frequency PWM wave */
+	if (set_prescale_div(period_cycles/PERIOD_MAX, &ps_divval,
+				&tb_divval)) {
+		rtdm_printk("Unsupported values\n");
+		return -EINVAL;
+	}
+	rtdm_printk( "ps_divval : %lu\n",ps_divval);
+	rtdm_printk( "tb_divval : %lu\n",tb_divval);
+
+
+	/* Update clock prescaler values */
+	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_CLKDIV_MASK, tb_divval);
+	/* Update period & duty cycle with presacler division */
+	period_cycles = period_cycles / ps_divval;
+	duty_cycles = duty_cycles / ps_divval;
+
+	rtdm_printk( "Period cycles : %lu\n",period_cycles);
+	rtdm_printk("Duty cycles : %lu\n",duty_cycles);
+
+	/* Configure shadow loading on Period register */
+	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_PRDLD_MASK, TBCTL_PRDLD_SHDW);
+	ehrpwm_write(epwm1_0_map, TBPRD, period_cycles);
+	/* Configure ehrpwm counter for up-count mode */
+	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_CTRMODE_MASK,
+			TBCTL_CTRMODE_UP);
+//	mf2044_rtdm_ioctl_nrt(NULL,NULL,request_command,period_cycles);
+
+	ehrpwm_write(epwm1_0_map, CMPA, duty_cycles);
+
+//	request_command = MF2044_IOCTL_SET_DUTY_CYCLE;
+//	request_command |= pin;
+//	request_value = (((int)(SYSCLK/freq)) + 1) * (duty * 0.01);
+//	request_value = (unsigned int)request_value << (4*4);
+//	mf2044_rtdm_ioctl_nrt(NULL,NULL,request_command,request_value);
 
 	return res;
 }
