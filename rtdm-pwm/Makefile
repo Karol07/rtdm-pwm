@@ -42,11 +42,9 @@ LDFLAGS+=-Xlinker -rpath -Xlinker $(shell $(XENOCONFIG) --libdir)
 #all:: $(APPLICATIONS)
 all:: 
 	$(CC) -c -fPIC mf2044-pwm-lib.c -o mf2044-pwm-lib.o  $(CFLAGS) $(LDFLAGS) $(LDLIBS)
-	$(CC) mf2044-pwm-lib.o -shared -o libmf2044-pwm-lib.so $(CFLAGS) $(LDFLAGS) $(LDLIBS)
-	$(CC) -c mf2044-pwm-test-p0819.c $(CFLAGS) $(LDFLAGS) $(LDLIBS)
-	$(CC) -c mf2044-pwm-test-p0914.c $(CFLAGS) $(LDFLAGS) $(LDLIBS)
-	$(CC) -o test-p0819 mf2044-pwm-test-p0819.o $(CFLAGS) $(LDFLAGS) $(LDLIBS) -L. -lmf2044-pwm-lib -lrtdm -lxenomai -g -O0
-	$(CC) -o test-p0914 mf2044-pwm-test-p0914.o $(CFLAGS) $(LDFLAGS) $(LDLIBS) -L. -lmf2044-pwm-lib -lrtdm -lxenomai -g -O0
+	$(CC) mf2044-pwm-lib.o -shared -o libpwm-lib.so $(CFLAGS) $(LDFLAGS) $(LDLIBS)
+	$(CC) -c mf2044-pwm-test.c $(CFLAGS) $(LDFLAGS) $(LDLIBS)
+	$(CC) -o mf2044-pwm-test mf2044-pwm-test.o $(CFLAGS) $(LDFLAGS) $(LDLIBS) -L. -lpwm-lib -lrtdm -lxenomai -g -O0
 
 clean::
 	$(RM) $(APPLICATIONS) *.o
@@ -61,7 +59,7 @@ all::
 clean::
 	$(RM) $(LIBRARIES) *.so
 	$(RM) libmf2044-pwm-lib.so
-	$(RM) test-p0819 test-p0914
+	$(RM) mf2044-pwm-test
 
 endif
 
@@ -107,6 +105,6 @@ clean::
 	$(RM) -R .tmp*
 	$(RM) $(LIBRARIES) *.so
 	$(RM) libmf2044-pwm-lib.so
-	$(RM) test-p0819 test-p0914
+	$(RM) mf2044-pwm-test
 
 endif

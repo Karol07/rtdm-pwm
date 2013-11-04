@@ -29,6 +29,7 @@ MODULE_AUTHOR("Seonghyun Kim");
 #define SOME_SUB_CLASS		4711
 
 #define SYSCLK 100000000
+#define FREQ_CONS 100000
 
 void __iomem *cm_per_map;
 void __iomem *epwm1_0_map;
@@ -142,11 +143,6 @@ void __iomem *epwm2_1_map;
 
 #define NUM_PWM_CHANNEL		2	/* EHRPWM channels */
 
-
-
-
-
-
 #define MF2044_PWM_1_0 1 << 4 //P9.14
 #define MF2044_PWM_1_1 1 << 5 //P9.16
 #define MF2044_PWM_0_0 1 << 6 //P9.22
@@ -163,10 +159,11 @@ void __iomem *epwm2_1_map;
 #define MF2044_IOCTL_SET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 6)
 
 static int pin=MF2044_PWM_1_0;
-static int freq=100;
-static int duty=50;
 
-int pm_init[3];
+int pm_init[3]={1<<4,100,100};
+int frequencies[6]={0,0,0,0,0,0};
+int dutycycles[6]={100,100,100,100,100,100};
+
 compat_module_param_array(pm_init,int,NULL,0);
 
 /**
@@ -261,32 +258,31 @@ static int mf2044_rtdm_close_nrt(struct rtdm_dev_context *context,
 	return 0;
 }
 
-static int zd_d(void __iomem *target,
-	int freq_, int duty_)
-
+static int _set_freq_duty(void __iomem *target,
+	int freq_, int duty_, int isA)
 {
 	unsigned short ps_divval, tb_divval;
 	unsigned short aqcsfrc_val, aqcsfrc_mask;
 	unsigned long long c;
 	unsigned long period_cycles, duty_cycles;
 
-	period_cycles = freq_ * 100000;
-	duty_cycles   = period_cycles;
-//	duty_cycles = duty_cycles* (duty_/100.0);
-
-	do_div(duty_cycles, 100.0/duty);
+	period_cycles = freq_ * FREQ_CONS;
+	duty_cycles   = period_cycles / (int)(100/duty_);
 
 	rtdm_printk( "1.Period cycles : %lu\n",period_cycles);
 	rtdm_printk( "2.Duty cycles : %lu\n",duty_cycles);
-	rtdm_printk( "NSEC_PER_SEC : %d\n",NSEC_PER_SEC);
 
 	ehrpwm_modify(epwm1_0_map, AQSFRC, AQSFRC_RLDCSF_MASK,
 			AQSFRC_RLDCSF_ZRO);
-	aqcsfrc_val = AQCSFRC_CSFA_FRCDIS;
-	aqcsfrc_mask = AQCSFRC_CSFA_MASK;
-	ehrpwm_modify(epwm1_0_map, AQCSFRC, aqcsfrc_mask, aqcsfrc_val);
+	if (1 == isA) {
+		aqcsfrc_val = AQCSFRC_CSFA_FRCDIS;
+		aqcsfrc_mask = AQCSFRC_CSFA_MASK;
+	} else {
+		aqcsfrc_val = AQCSFRC_CSFB_FRCDIS;
+		aqcsfrc_mask = AQCSFRC_CSFB_MASK;
+	}
 
-	rtdm_printk("start\n");
+	ehrpwm_modify(epwm1_0_map, AQCSFRC, aqcsfrc_mask, aqcsfrc_val);
 
 	/* Enable time counter for free_run */
 	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_RUN_MASK, TBCTL_FREE_RUN);
@@ -301,18 +297,12 @@ static int zd_d(void __iomem *target,
 	do_div(c, NSEC_PER_SEC);
 	duty_cycles = (unsigned long) c;
 
-	rtdm_printk( "1.Period cycles : %lu\n",period_cycles);
-	rtdm_printk( "2.Duty cycles : %lu\n",duty_cycles);
-
 	/* Configure clock prescaler to support Low frequency PWM wave */
 	if (set_prescale_div(period_cycles/PERIOD_MAX, &ps_divval,
 				&tb_divval)) {
 		rtdm_printk("Unsupported values\n");
 		return -EINVAL;
 	}
-	rtdm_printk( "ps_divval : %lu\n",ps_divval);
-	rtdm_printk( "tb_divval : %lu\n",tb_divval);
-
 
 	/* Update clock prescaler values */
 	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_CLKDIV_MASK, tb_divval);
@@ -320,17 +310,19 @@ static int zd_d(void __iomem *target,
 	period_cycles = period_cycles / ps_divval;
 	duty_cycles = duty_cycles / ps_divval;
 
-	rtdm_printk( "Period cycles : %lu\n",period_cycles);
-	rtdm_printk("Duty cycles : %lu\n",duty_cycles);
-
 	/* Configure shadow loading on Period register */
 	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_PRDLD_MASK, TBCTL_PRDLD_SHDW);
 	ehrpwm_write(epwm1_0_map, TBPRD, period_cycles);
+
 	/* Configure ehrpwm counter for up-count mode */
 	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_CTRMODE_MASK,
 			TBCTL_CTRMODE_UP);
 
-	ehrpwm_write(epwm1_0_map, CMPA, duty_cycles);
+	if (1 == isA) {
+		ehrpwm_write(epwm1_0_map, CMPA, duty_cycles);
+	} else {
+		ehrpwm_write(epwm1_0_map, CMPB, duty_cycles);
+	}
 
 	return 0;
 }
@@ -340,42 +332,55 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		unsigned int request, void __user *arg)
 {
 	unsigned int res=0;
+	int pindex = 0;
 	void __iomem *target;
-	int freq_ = 200;
-	int duty_ = 50;
+	int freq_ = 0;
+	int duty_ = 0;
+	int isA = 0;
 
-//	rtdm_printk("%s %d - before %x\n", __func__, __LINE__, request);
-//	rtdm_printk("%s %d - %x\n", __func__, __LINE__, MF2044_PWM_1_0);
-//	rtdm_printk("%s %d - %x\n", __func__, __LINE__, ~(MF2044_PWM_1_0));
 	target = epwm1_0_map;
 
 	if (request & MF2044_PWM_1_0) {
 		rtdm_printk("P9.14\n");
 		target = epwm1_0_map;
 		request &= ~(MF2044_PWM_1_0);
+		pindex = 0;
+		isA = 1;
 	} else if (request & MF2044_PWM_1_1) {
 		rtdm_printk("P9.16\n");
 		target = epwm1_1_map;
 		request &= ~(MF2044_PWM_1_1);
+		pindex = 1;
+		isA = 0;
 	} else if (request & MF2044_PWM_0_0) {
 		rtdm_printk("P9.22\n");
 		target = epwm0_0_map;
 		request &= ~(MF2044_PWM_0_0);
+		pindex = 2;
+		isA = 1;
 	} else if (request & MF2044_PWM_0_1) {
 		rtdm_printk("P9.21\n");
 		target = epwm0_1_map;
 		request &= ~(MF2044_PWM_0_1);
+		pindex = 3;
+		isA = 0;
 	} else if (request & MF2044_PWM_2_0) {
 		rtdm_printk("P8.19\n");
 		target = epwm2_0_map;
 		request &= ~(MF2044_PWM_2_0);
+		pindex = 4;
+		isA = 1;
 	} else if (request & MF2044_PWM_2_1) {
 		rtdm_printk("P8.13\n");
 		target = epwm2_1_map;
 		request &= ~(MF2044_PWM_2_1);
+		pindex = 5;
+		isA = 0;
 	}
 
-//	rtdm_printk("command 0x%x\n", request);
+	freq_ = frequencies[pindex];
+	duty_ = dutycycles[pindex];
+
 	switch(request)
 	{
 		case MF2044_IOCTL_ON:
@@ -385,82 +390,31 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			rtdm_printk("MF2044_IOCTL_OFF\n");
 			break;
 		case MF2044_IOCTL_GET_DUTY_CYCLE:
+			rtdm_printk("MF2044_IOCTL_GET D\n");
+			*(int*)arg = dutycycles[pindex];
+			return 0;
 			break;
 		case MF2044_IOCTL_SET_DUTY_CYCLE:
 			rtdm_printk("MF2044_IOCTL_SET D\n");
 			duty_ = (int)arg;
+			dutycycles[pindex]=duty_;
 			break;
 		case MF2044_IOCTL_GET_FREQUENCY:
+			rtdm_printk("MF2044_IOCTL_GET F\n");
+			*(int*)arg = frequencies[pindex];
+			return 0;
 			break;
 		case MF2044_IOCTL_SET_FREQUENCY:
 			rtdm_printk("MF2044_IOCTL_SET F\n");
 			freq_ = (int)arg;
+			frequencies[pindex]=freq_;
 			break;
 	}
 
-//	period_cycles = freq_ * 100000;
+	rtdm_printk( "ioctl Period cycles : %d\n",(int)freq_);
+	rtdm_printk( "ioctl Duty cycles : %d\n",(int)duty_);
 
-	rtdm_printk( "Init Period cycles : %d\n",(int)freq_);
-	rtdm_printk( "Init Duty cycles : %d\n",(int)duty_);
-
-//	duty_cycles   = period_cycles * (duty_/100.0);
-
-	zd_d(target,(int)freq_,(int)duty_);
-//	rtdm_printk( "1.Period cycles : %lu\n",period_cycles);
-//	rtdm_printk( "2.Duty cycles : %lu\n",duty_cycles);
-//	rtdm_printk( "NSEC_PER_SEC : %d\n",NSEC_PER_SEC);
-//
-//	ehrpwm_modify(epwm1_0_map, AQSFRC, AQSFRC_RLDCSF_MASK,
-//			AQSFRC_RLDCSF_ZRO);
-//	aqcsfrc_val = AQCSFRC_CSFA_FRCDIS;
-//	aqcsfrc_mask = AQCSFRC_CSFA_MASK;
-//	ehrpwm_modify(epwm1_0_map, AQCSFRC, aqcsfrc_mask, aqcsfrc_val);
-//
-//	rtdm_printk("start\n");
-//
-//	/* Enable time counter for free_run */
-//	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_RUN_MASK, TBCTL_FREE_RUN);
-//
-//	c = SYSCLK;
-//	c = (c * period_cycles);
-//	do_div(c, NSEC_PER_SEC);
-//	period_cycles = (unsigned long) c;
-//
-//	c = SYSCLK;
-//	c = (c * duty_cycles);
-//	do_div(c, NSEC_PER_SEC);
-//	duty_cycles = (unsigned long) c;
-//
-//	rtdm_printk( "1.Period cycles : %lu\n",period_cycles);
-//	rtdm_printk( "2.Duty cycles : %lu\n",duty_cycles);
-//
-//	/* Configure clock prescaler to support Low frequency PWM wave */
-//	if (set_prescale_div(period_cycles/PERIOD_MAX, &ps_divval,
-//				&tb_divval)) {
-//		rtdm_printk("Unsupported values\n");
-//		return -EINVAL;
-//	}
-//	rtdm_printk( "ps_divval : %lu\n",ps_divval);
-//	rtdm_printk( "tb_divval : %lu\n",tb_divval);
-//
-//
-//	/* Update clock prescaler values */
-//	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_CLKDIV_MASK, tb_divval);
-//	/* Update period & duty cycle with presacler division */
-//	period_cycles = period_cycles / ps_divval;
-//	duty_cycles = duty_cycles / ps_divval;
-//
-//	rtdm_printk( "Period cycles : %lu\n",period_cycles);
-//	rtdm_printk("Duty cycles : %lu\n",duty_cycles);
-//
-//	/* Configure shadow loading on Period register */
-//	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_PRDLD_MASK, TBCTL_PRDLD_SHDW);
-//	ehrpwm_write(epwm1_0_map, TBPRD, period_cycles);
-//	/* Configure ehrpwm counter for up-count mode */
-//	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_CTRMODE_MASK,
-//			TBCTL_CTRMODE_UP);
-//
-//	ehrpwm_write(epwm1_0_map, CMPA, duty_cycles);
+	_set_freq_duty(target,(int)freq_,(int)duty_,isA);
 
 	return 0;
 }
@@ -516,19 +470,20 @@ int __init simple_rtdm_init(void)
 	int freq_ = (int) pm_init[1];
 	int duty_ = (int) pm_init[2];
 	unsigned int tbprd = -1;
+	double d =  duty_ * 0.01;
 
-	pin_ = 1<<4;
-	freq_ = 300;
-	duty_ = 50;
 	rtdm_printk("pin %d\n", pin_);
 	rtdm_printk("freq %d\n", freq_);
 	rtdm_printk("duty %d\n", duty_);
 
-	period_cycles = freq_ * 100000;
-	duty_cycles   = period_cycles * (duty_/100.0);
+	period_cycles = freq_ * FREQ_CONS;
+//	d = period_cycles * d;
+	duty_cycles = period_cycles * 100;
+	do_div(duty_cycles,duty_);
+
+//	duty_cycles   = period_cycles / (int)(100/duty_);
 	rtdm_printk( "1.Period cycles : %lu\n",period_cycles);
 	rtdm_printk( "2.Duty cycles : %lu\n",duty_cycles);
-	rtdm_printk( "NSEC_PER_SEC : %d\n",NSEC_PER_SEC);
 
 	res = rtdm_dev_register(&device);
 
@@ -568,24 +523,18 @@ int __init simple_rtdm_init(void)
 	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
 	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
 
-//	iowrite32(0xf4240000, epwm1_0_map+TBCNT);
-//	iowrite32(0x568d0000, epwm1_0_map+CMPAHR);
-//	iowrite32(0x24f80000, epwm1_0_map+TBCNT);
-//	iowrite32(0x127c0000, epwm1_0_map+CMPAHR);
-
 	request_command = MF2044_IOCTL_SET_FREQUENCY;
 	request_command |= pin;
-//	request_value = ((int)(SYSCLK/freq))<<16;
-//	mf2044_rtdm_ioctl_nrt(NULL,NULL,request_command,request_value);
 
 	/* Changes to shadow mode */
 	ehrpwm_modify(epwm1_0_map, AQSFRC, AQSFRC_RLDCSF_MASK,
 			AQSFRC_RLDCSF_ZRO);
-	aqcsfrc_val = AQCSFRC_CSFA_FRCDIS;
-	aqcsfrc_mask = AQCSFRC_CSFA_MASK;
-	ehrpwm_modify(epwm1_0_map, AQCSFRC, aqcsfrc_mask, aqcsfrc_val);
+//	aqcsfrc_val = AQCSFRC_CSFA_FRCDIS;
+//	aqcsfrc_mask = AQCSFRC_CSFA_MASK;
+	aqcsfrc_val = AQCSFRC_CSFB_FRCDIS;
+	aqcsfrc_mask = AQCSFRC_CSFB_MASK;
 
-	rtdm_printk("start\n");
+	ehrpwm_modify(epwm1_0_map, AQCSFRC, aqcsfrc_mask, aqcsfrc_val);
 
 	/* Enable time counter for free_run */
 	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_RUN_MASK, TBCTL_FREE_RUN);
@@ -600,18 +549,12 @@ int __init simple_rtdm_init(void)
 	do_div(c, NSEC_PER_SEC);
 	duty_cycles = (unsigned long) c;
 
-	rtdm_printk( "1.Period cycles : %lu\n",period_cycles);
-	rtdm_printk( "2.Duty cycles : %lu\n",duty_cycles);
-
 	/* Configure clock prescaler to support Low frequency PWM wave */
 	if (set_prescale_div(period_cycles/PERIOD_MAX, &ps_divval,
 				&tb_divval)) {
 		rtdm_printk("Unsupported values\n");
 		return -EINVAL;
 	}
-	rtdm_printk( "ps_divval : %lu\n",ps_divval);
-	rtdm_printk( "tb_divval : %lu\n",tb_divval);
-
 
 	/* Update clock prescaler values */
 	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_CLKDIV_MASK, tb_divval);
@@ -629,7 +572,7 @@ int __init simple_rtdm_init(void)
 	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_CTRMODE_MASK,
 			TBCTL_CTRMODE_UP);
 
-	ehrpwm_write(epwm1_0_map, CMPA, duty_cycles);
+	ehrpwm_write(epwm1_0_map, CMPB, duty_cycles);
 
 	return res;
 }
