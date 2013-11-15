@@ -19,6 +19,8 @@
 #define MF2044_IOCTL_GET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 5)
 #define MF2044_IOCTL_SET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 6)
 
+#define FREQ_CONS 100000
+
 static int fd = -1;
 
 int mf2044_pwm_open(void)
