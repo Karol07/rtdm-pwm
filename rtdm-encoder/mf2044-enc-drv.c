@@ -46,11 +46,6 @@ MODULE_AUTHOR("Seonghyun Kim");
 #define EQEP2_BASE 0x48304180
 #define EQEP_SZ 0x7f
 
-#define TBCNT 0x8
-#define CMPAHR 0x10
-#define TBPRD 0xa
-#define CMPA 0x12
-
 #define MF2044_ENC_0 1 << 4 
 #define MF2044_ENC_1 1 << 5 
 #define MF2044_ENC_2 1 << 6 
@@ -64,8 +59,7 @@ void __iomem *cm_per_map;
 void __iomem *eqep0_map;
 void __iomem *eqep1_map;
 void __iomem *eqep2_map;
-
-void __iomem *mmio_base; //eqep0_map;
+void __iomem *mmio_base;
 
 u64 clk_rate = SYSCLK;
 
@@ -73,6 +67,7 @@ u64 clk_rate = SYSCLK;
 #define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
 #define MF2044_IOCTL_OFF _IO(MF2044_IOCTL_MAGIC, 2)
 #define MF2044_IOCTL_GET_POSITION _IO(MF2044_IOCTL_MAGIC, 3)
+#define MF2044_IOCTL_SET_POSITION _IO(MF2044_IOCTL_MAGIC, 4)
 #define MF2044_IOCTL_GET_PERIOD _IO(MF2044_IOCTL_MAGIC, 5)
 #define MF2044_IOCTL_SET_PERIOD _IO(MF2044_IOCTL_MAGIC, 6)
 #define MF2044_IOCTL_GET_MODE _IO(MF2044_IOCTL_MAGIC, 7)
@@ -182,32 +177,6 @@ u64 clk_rate = SYSCLK;
 #define TIEQEP_MODE_ABSOLUTE    0
 #define TIEQEP_MODE_RELATIVE    1
 
-// Structure defining the characteristics of the eQEP unit
-struct eqep_chip
-{
-    // Platform device for this eQEP unit
-    struct platform_device *pdev;
-    
-    // Pointer to the base of the memory of the eQEP unit
-    void __iomem           *mmio_base;
-    
-    // SYSCLKOUT to the eQEP unit
-    u32                     clk_rate;
-    
-    // IRQ for the eQEP unit
-    u16                     irq;
-    
-    // Mode of the eQEP unit
-    u8                      mode;
-    
-    // work stuct for the notify userspace work
-    struct work_struct      notify_work;
-    
-    // Backup for driver suspension
-    u16                     prior_qepctl;
-    u16                     prior_qeint;
-};
-
 static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		rtdm_user_info_t *user_info, 
 		unsigned int request, void __user *arg)
@@ -221,18 +190,12 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 	mmio_base = eqep1_map;
 
 	if (request & MF2044_ENC_0) {
-	rtdm_printk("enc0\n");
-
 		mmio_base = eqep0_map;
 		request &= ~(MF2044_ENC_0);
 	} else if (request & MF2044_ENC_1) {
-	rtdm_printk("enc1\n");
-
 		mmio_base = eqep1_map;
 		request &= ~(MF2044_ENC_1);
 	} else if (request & MF2044_ENC_2) {
-	rtdm_printk("enc2\n");
-
 		mmio_base = eqep2_map;
 		request &= ~(MF2044_ENC_2);
 	}
@@ -240,23 +203,20 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 	switch (request)
 	{
 		case MF2044_IOCTL_GET_POSITION:
-	rtdm_printk("get position\n");
-
 			if (mode == MF2044_MODE_ABSOLUTE) {
-	rtdm_printk("abso\n");
-
 				position = readl(mmio_base + QPOSCNT);
 			} else {
-	rtdm_printk("rel\n");
-
 				position = readl(mmio_base + QPOSLAT);
 			}
-	rtdm_printk("pos [%d]\n", position);
 			*(int32_t*)arg = position;
 			break;
+		case MF2044_IOCTL_SET_POSITION:
+			position = (int32_t)arg;
+			if (mode == MF2044_MODE_ABSOLUTE) {
+				 writel(position, mmio_base + QPOSCNT);
+			}
+			break;
 		case MF2044_IOCTL_GET_PERIOD:
-	rtdm_printk("get period\n");
-
 			if(!(readw(mmio_base + QEPCTL) & UTE))
 			{
 				*(uint64_t*)arg=0;
@@ -268,8 +228,6 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			*(uint64_t*)arg = period;
 			break;
 		case MF2044_IOCTL_SET_PERIOD:
-	rtdm_printk("set period\n");
-
 			period = (u64)arg;
 			// Disable the unit timer before modifying its period register
 			tmp = readw(mmio_base + QEPCTL);
@@ -291,13 +249,9 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			}
 			break;
 		case MF2044_IOCTL_GET_MODE:
-	rtdm_printk("get mode\n");
-
 			*(int*)arg = mode;
 			break;
 		case MF2044_IOCTL_SET_MODE:
-	rtdm_printk("set mode\n");
-
 			mode = (int)arg;
 			break;
 
@@ -316,7 +270,6 @@ static int simple_rtdm_open_nrt(struct rtdm_dev_context *context,
 {
 	struct resource  *r;
 	struct clk       *clk;
-	//	struct eqep_chip *eqep;
 	struct pinctrl   *pinctrl;
 	int               ret;
 	u64               period;
@@ -324,7 +277,6 @@ static int simple_rtdm_open_nrt(struct rtdm_dev_context *context,
 	u32                value;
 
 	rtdm_printk("PWM driver open without errors!\n");
-
 	mmio_base = eqep1_map;
 
 	// Read decoder control settings
@@ -408,7 +360,6 @@ static struct rtdm_device device = {
 	.struct_version = RTDM_DEVICE_STRUCT_VER,
 
 	.device_flags = RTDM_NAMED_DEVICE | RTDM_EXCLUSIVE,
-	.context_size = sizeof(struct eqep_chip),
 	.device_name = DEVICE_NAME,
 
 	.open_nrt = simple_rtdm_open_nrt,
@@ -424,7 +375,7 @@ static struct rtdm_device device = {
 	.profile_version = 1,
 	.driver_name = DEVICE_NAME,
 	.driver_version = RTDM_DRIVER_VER(0, 0, 1),
-	.peripheral_name = "enc driver for mf2044",
+	.peripheral_name = "encoder driver for mf2044",
 	.provider_name = "Seonghyun Kim",
 	.proc_name = device.device_name,
 };
@@ -470,7 +421,6 @@ int __init simple_rtdm_init(void)
 	}
 
 	cm_per_map = ioremap(CM_PER_BASE,CM_PER_SZ);
-	mmio_base = ioremap(EQEP0_BASE,EQEP_SZ);
 	eqep0_map = ioremap(EQEP0_BASE,EQEP_SZ);
 	eqep1_map = ioremap(EQEP1_BASE,EQEP_SZ);
 	eqep2_map = ioremap(EQEP2_BASE,EQEP_SZ);
@@ -480,7 +430,7 @@ int __init simple_rtdm_init(void)
 	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
 
 	clk_rate = SYSCLK;
-	rtdm_printk("clk_rate [%llu]\n", (u64)clk_rate);
+//	rtdm_printk("clk_rate [%llu]\n", (u64)clk_rate);
 
 	return res;
 }
