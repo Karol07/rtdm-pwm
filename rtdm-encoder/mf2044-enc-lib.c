@@ -96,7 +96,7 @@ int32_t mf2044_enc_position_get(MF2044_ENC_PINS pin)
 	command |= pin;
 	if (rt_dev_ioctl(fd, command, &det) == -1)
 		printf("TIOCMGET failed: %s\n", strerror(errno));
-	printf("pos %d\n",det);
+	printf("pos [%d]\n",det);
 	return det;
 }
 

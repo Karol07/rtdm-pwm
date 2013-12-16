@@ -55,8 +55,8 @@ MODULE_AUTHOR("Seonghyun Kim");
 #define MF2044_ENC_1 1 << 5 
 #define MF2044_ENC_2 1 << 6 
 
-#define MF2044_MODE_ABSOLUTE 0
-#define MF2044_MODE_RELATIVE 1
+#define MF2044_MODE_ABSOLUTE 1
+#define MF2044_MODE_RELATIVE 2
 
 int mode = MF2044_MODE_ABSOLUTE;
 
@@ -77,10 +77,6 @@ u64 clk_rate = SYSCLK;
 #define MF2044_IOCTL_SET_PERIOD _IO(MF2044_IOCTL_MAGIC, 6)
 #define MF2044_IOCTL_GET_MODE _IO(MF2044_IOCTL_MAGIC, 7)
 #define MF2044_IOCTL_SET_MODE _IO(MF2044_IOCTL_MAGIC, 8)
-
-#define eQEP0 "/sys/devices/ocp.2/48300000.epwmss/48300180.eqep"
-#define eQEP1 "/sys/devices/ocp.2/48302000.epwmss/48302180.eqep"
-#define eQEP2 "/sys/devices/ocp.2/48304000.epwmss/48304180.eqep"
 
 // eQEP register offsets from its base IO address
 #define QPOSCNT    0x0000
@@ -222,16 +218,21 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 	u16 tmp;
 	u64 period;
 	struct clk       *clk;
-//	u32 clk_rate = clk_get_rate(clk);
-	mmio_base = eqep0_map;
+	mmio_base = eqep1_map;
 
 	if (request & MF2044_ENC_0) {
+	rtdm_printk("enc0\n");
+
 		mmio_base = eqep0_map;
 		request &= ~(MF2044_ENC_0);
 	} else if (request & MF2044_ENC_1) {
+	rtdm_printk("enc1\n");
+
 		mmio_base = eqep1_map;
 		request &= ~(MF2044_ENC_1);
 	} else if (request & MF2044_ENC_2) {
+	rtdm_printk("enc2\n");
+
 		mmio_base = eqep2_map;
 		request &= ~(MF2044_ENC_2);
 	}
@@ -239,14 +240,23 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 	switch (request)
 	{
 		case MF2044_IOCTL_GET_POSITION:
+	rtdm_printk("get position\n");
+
 			if (mode == MF2044_MODE_ABSOLUTE) {
+	rtdm_printk("abso\n");
+
 				position = readl(mmio_base + QPOSCNT);
 			} else {
+	rtdm_printk("rel\n");
+
 				position = readl(mmio_base + QPOSLAT);
 			}
+	rtdm_printk("pos [%d]\n", position);
 			*(int32_t*)arg = position;
 			break;
 		case MF2044_IOCTL_GET_PERIOD:
+	rtdm_printk("get period\n");
+
 			if(!(readw(mmio_base + QEPCTL) & UTE))
 			{
 				*(uint64_t*)arg=0;
@@ -258,6 +268,8 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			*(uint64_t*)arg = period;
 			break;
 		case MF2044_IOCTL_SET_PERIOD:
+	rtdm_printk("set period\n");
+
 			period = (u64)arg;
 			// Disable the unit timer before modifying its period register
 			tmp = readw(mmio_base + QEPCTL);
@@ -279,9 +291,13 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			}
 			break;
 		case MF2044_IOCTL_GET_MODE:
+	rtdm_printk("get mode\n");
+
 			*(int*)arg = mode;
 			break;
 		case MF2044_IOCTL_SET_MODE:
+	rtdm_printk("set mode\n");
+
 			mode = (int)arg;
 			break;
 
@@ -305,17 +321,25 @@ static int simple_rtdm_open_nrt(struct rtdm_dev_context *context,
 	int               ret;
 	u64               period;
 	u16               status;
-	u8                value;
+	u32                value;
+
+	rtdm_printk("PWM driver open without errors!\n");
+
+	mmio_base = eqep1_map;
 
 	// Read decoder control settings
 	status = readw(mmio_base + QDECCTL);
 
+	value = 1;
 	status = ((value) ? status | QSRC0 : status & ~QSRC0) & ~QSRC1;
-	status = status & ~QAP;
-	status = status & ~QBP;
+	value = 0;
+        status = (value) ? status | QAP : status & ~QAP;
+        status = (value) ? status | QBP : status & ~QBP;
 	status = (value) ? status | QIP : status & ~QIP;
 	status = (value) ? status | QSP : status & ~QSP;
 	status = (value) ? status | SWAP : status & ~SWAP;
+
+	writew(status, mmio_base + QDECCTL);
 
 	// Initialize the position counter to zero
 	writel(0, mmio_base + QPOSINIT);
@@ -455,8 +479,6 @@ int __init simple_rtdm_init(void)
 	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
 	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
 
-//	clk = devm_clk_get();
-//	clk_rate = clk_get_rate(clk);
 	clk_rate = SYSCLK;
 	rtdm_printk("clk_rate [%llu]\n", (u64)clk_rate);
 
