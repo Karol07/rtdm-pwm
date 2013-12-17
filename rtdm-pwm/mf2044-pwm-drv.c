@@ -331,7 +331,6 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		rtdm_user_info_t *user_info, 
 		unsigned int request, void __user *arg)
 {
-	unsigned int res=0;
 	int pindex = 0;
 	void __iomem *target;
 	int freq_ = 0;
@@ -459,7 +458,6 @@ int __init simple_rtdm_init(void)
 {
 	int res = -1;
 	int request_command =0;
-	int request_value =0;
 
 	unsigned long period_cycles, duty_cycles;
 	unsigned short ps_divval, tb_divval;
@@ -469,8 +467,6 @@ int __init simple_rtdm_init(void)
 	int pin_ = (int) pm_init[0];
 	int freq_ = (int) pm_init[1];
 	int duty_ = (int) pm_init[2];
-	unsigned int tbprd = -1;
-	double d =  duty_ * 0.01;
 
 	rtdm_printk("pin %d\n", pin_);
 	rtdm_printk("freq %d\n", freq_);
