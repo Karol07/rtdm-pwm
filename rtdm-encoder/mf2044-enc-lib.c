@@ -48,6 +48,11 @@ MF2044_ENC_MODES mf2044_enc_mode_get(MF2044_ENC_PINS pin)
 {
 	int mode = MF2044_ENC_MODE_NULL;
 	int command = MF2044_IOCTL_GET_MODE;
+
+	if (MF2044_ENC_PIN_NULL>=pin || MF2044_ENC_PIN_MAX <= pin) {
+		printf("param failed: pin[%d] is too high or too low.\n", pin);
+		return EXIT_FAILURE;
+	}
 	command |= pin;
 
 	if (rt_dev_ioctl(fd, command, &mode) == -1)
@@ -62,6 +67,16 @@ int mf2044_enc_mode_set(MF2044_ENC_PINS pin, MF2044_ENC_MODES mode)
 {
 	unsigned int det = 0;
 	int command = MF2044_IOCTL_SET_MODE;
+
+	if (MF2044_ENC_PIN_NULL>=pin || MF2044_ENC_PIN_MAX <= pin) {
+		printf("param failed: pin[%d] is too high or too low.\n", pin);
+		return EXIT_FAILURE;
+	}
+	if (MF2044_ENC_MODE_NULL>=mode || MF2044_ENC_MODE_MAX <= mode) {
+		printf("param failed: mode[%d] is too high or too low.\n", mode);
+		return EXIT_FAILURE;
+	}
+
 	command |= pin;
 	if (rt_dev_ioctl(fd, command, mode) == -1)
 		printf("TIOCMGET failed: %s\n", strerror(errno));
@@ -72,6 +87,12 @@ uint64_t mf2044_enc_period_get(MF2044_ENC_PINS pin)
 {
 	uint64_t ret;
 	int command = MF2044_IOCTL_GET_PERIOD;
+
+	if (MF2044_ENC_PIN_NULL>=pin || MF2044_ENC_PIN_MAX <= pin) {
+		printf("param failed: pin[%d] is too high or too low.\n", pin);
+		return EXIT_FAILURE;
+	}
+
 	command |= pin;
 
 	if (rt_dev_ioctl(fd, command, &ret) == -1)
@@ -85,6 +106,12 @@ uint64_t mf2044_enc_period_get(MF2044_ENC_PINS pin)
 int mf2044_enc_period_set(MF2044_ENC_PINS pin, uint64_t period)
 {
 	int command = MF2044_IOCTL_SET_PERIOD;
+
+	if (MF2044_ENC_PIN_NULL>=pin || MF2044_ENC_PIN_MAX <= pin) {
+		printf("param failed: pin[%d] is too high or too low.\n", pin);
+		return EXIT_FAILURE;
+	}
+
 	command |= pin;
 
 	if (rt_dev_ioctl(fd, command, period) == -1)
@@ -99,6 +126,12 @@ int32_t mf2044_enc_position_get(MF2044_ENC_PINS pin)
 {
 	uint32_t det = 0;
 	int command = MF2044_IOCTL_GET_POSITION;
+
+	if (MF2044_ENC_PIN_NULL>=pin || MF2044_ENC_PIN_MAX <= pin) {
+		printf("param failed: pin[%d] is too high or too low.\n", pin);
+		return EXIT_FAILURE;
+	}
+
 	command |= pin;
 	if (rt_dev_ioctl(fd, command, &det) == -1)
 		printf("TIOCMGET failed: %s\n", strerror(errno));
@@ -108,6 +141,12 @@ int32_t mf2044_enc_position_get(MF2044_ENC_PINS pin)
 int mf2044_enc_position_set(MF2044_ENC_PINS pin, int32_t position)
 {
 	int command = MF2044_IOCTL_SET_POSITION;
+
+	if (MF2044_ENC_PIN_NULL>=pin || MF2044_ENC_PIN_MAX <= pin) {
+		printf("param failed: pin[%d] is too high or too low.\n", pin);
+		return EXIT_FAILURE;
+	}
+
 	command |= pin;
 
 	if (rt_dev_ioctl(fd, command, position) == -1)
@@ -115,6 +154,7 @@ int mf2044_enc_position_set(MF2044_ENC_PINS pin, int32_t position)
 		printf("TIOCMGET failed: %s\n", strerror(errno));
 		return EXIT_FAILURE;
 	}
+
 	return EXIT_SUCCESS;
 }
 
@@ -125,6 +165,12 @@ double mf2044_enc_velocity_get(MF2044_ENC_PINS pin)
 	uint64_t period = mf2044_enc_period_get(pin);
 	struct timespec ts;
 	MF2044_ENC_MODES mode = mf2044_enc_mode_get(pin);
+
+	if (MF2044_ENC_PIN_NULL>=pin || MF2044_ENC_PIN_MAX <= pin) {
+		printf("param failed: pin[%d] is too high or too low.\n", pin);
+		return EXIT_FAILURE;
+	}
+
 	switch(mode)
 	{
 		case MF2044_ENC_MODE_RELATIVE:

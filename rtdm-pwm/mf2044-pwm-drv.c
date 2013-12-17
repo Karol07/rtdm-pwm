@@ -154,9 +154,7 @@ void __iomem *epwm2_1_map;
 #define MF2044_IOCTL_GET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 5)
 #define MF2044_IOCTL_SET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 6)
 
-static int pin=MF2044_PWM_1_0;
-
-int pm_init[3]={1<<4,100,100};
+int pm_init[4]={1,100,100,1};
 int frequencies[6]={0,0,0,0,0,0};
 int dutycycles[6]={100,100,100,100,100,100};
 
@@ -260,8 +258,11 @@ static int _set_freq_duty(void __iomem *target,
 	unsigned long long c;
 	unsigned long period_cycles, duty_cycles;
 
-	period_cycles = freq_ * FREQ_CONS;
-	duty_cycles   = period_cycles / (int)(100/duty_);
+//	period_cycles = freq_ * freq_cons;
+//	duty_cycles   = period_cycles / (int)(100/duty_);
+
+	period_cycles = freq_;
+	duty_cycles   = duty_;
 
 	rtdm_printk( "1.Period cycles : %lu\n",period_cycles);
 	rtdm_printk( "2.Duty cycles : %lu\n",duty_cycles);
@@ -446,24 +447,20 @@ static struct rtdm_device device = {
  *
  * It registers the RTDM device.
  * parameters:
- * pin : same as defines. i.e.) P9.14 = 1<<4
+ * pin : same as define orders. i.e.) P9.14 = 1, P8.13 = 6
  * freq : nanoseconds.
  * duty cycle : nanoseconds, not percent.
- *
+ * isA : a=1, b=0
  */
 int __init simple_rtdm_init(void)
 {
 	int res = -1;
-	int request_command =0;
-
 	unsigned long period_cycles, duty_cycles;
-	unsigned short ps_divval, tb_divval;
-	unsigned short aqcsfrc_val, aqcsfrc_mask;
-	unsigned long long c;
 
-	int pin_ = (int) pm_init[0];
+	int pin = (int) pm_init[0];
 	int freq_ = (int) pm_init[1];
 	int duty_ = (int) pm_init[2];
+	int isA = (int) pm_init[3];
 
 	period_cycles = freq_;
 	duty_cycles = duty_;
@@ -510,55 +507,7 @@ int __init simple_rtdm_init(void)
 	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
 	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
 
-	request_command = MF2044_IOCTL_SET_FREQUENCY;
-	request_command |= pin;
-
-	/* Changes to shadow mode */
-	ehrpwm_modify(epwm1_0_map, AQSFRC, AQSFRC_RLDCSF_MASK,
-			AQSFRC_RLDCSF_ZRO);
-	aqcsfrc_val = AQCSFRC_CSFB_FRCDIS;
-	aqcsfrc_mask = AQCSFRC_CSFB_MASK;
-
-	ehrpwm_modify(epwm1_0_map, AQCSFRC, aqcsfrc_mask, aqcsfrc_val);
-
-	/* Enable time counter for free_run */
-	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_RUN_MASK, TBCTL_FREE_RUN);
-
-	c = SYSCLK;
-	c = (c * period_cycles);
-	do_div(c, NSEC_PER_SEC);
-	period_cycles = (unsigned long) c;
-
-	c = SYSCLK;
-	c = (c * duty_cycles);
-	do_div(c, NSEC_PER_SEC);
-	duty_cycles = (unsigned long) c;
-
-	/* Configure clock prescaler to support Low frequency PWM wave */
-	if (set_prescale_div(period_cycles/PERIOD_MAX, &ps_divval,
-				&tb_divval)) {
-		rtdm_printk("Unsupported values\n");
-		return -EINVAL;
-	}
-
-	/* Update clock prescaler values */
-	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_CLKDIV_MASK, tb_divval);
-
-	/* Update period & duty cycle with presacler division */
-	period_cycles = period_cycles / ps_divval;
-	duty_cycles = duty_cycles / ps_divval;
-
-	rtdm_printk( "Period cycles : %lu\n",period_cycles);
-	rtdm_printk("Duty cycles : %lu\n",duty_cycles);
-
-	/* Configure shadow loading on Period register */
-	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_PRDLD_MASK, TBCTL_PRDLD_SHDW);
-	ehrpwm_write(epwm1_0_map, TBPRD, period_cycles);
-	/* Configure ehrpwm counter for up-count mode */
-	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_CTRMODE_MASK,
-			TBCTL_CTRMODE_UP);
-
-	ehrpwm_write(epwm1_0_map, CMPB, duty_cycles);
+	_set_freq_duty(epwm1_0_map, period_cycles, duty_cycles, isA);
 
 	return res;
 }
