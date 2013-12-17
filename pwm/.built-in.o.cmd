@@ -1,1 +1,0 @@
-cmd_drivers/pwm/built-in.o :=  /home/kim/linux-dev-charles/dl/gcc-linaro-arm-linux-gnueabihf-4.7-2013.04-20130415_linux/bin/arm-linux-gnueabihf-ld -EL    -r -o drivers/pwm/built-in.o drivers/pwm/core.o drivers/pwm/pwm-pca9685.o drivers/pwm/pwm-tiecap.o drivers/pwm/pwm-tiehrpwm.o drivers/pwm/pwm-tipwmss.o drivers/pwm/pwm-twl.o drivers/pwm/pwm-twl-led.o drivers/pwm/pwm_test.o 
