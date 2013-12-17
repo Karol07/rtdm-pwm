@@ -19,8 +19,6 @@
 #define MF2044_IOCTL_GET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 5)
 #define MF2044_IOCTL_SET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 6)
 
-#define FREQ_CONS 100000
-
 static int fd = -1;
 
 int mf2044_pwm_open(void)
@@ -37,26 +35,6 @@ int mf2044_pwm_open(void)
 int mf2044_pwm_close(void)
 {
 	rt_dev_close(fd);
-	return EXIT_SUCCESS;
-}
-
-int mf2044_pwm_init(MF2044_PWM_PINS pin)
-{
-	if (rt_dev_ioctl(fd, MF2044_IOCTL_ON) == -1)
-	{
-		printf("TIOCMGET failed: %s\n", strerror(errno));
-		return EXIT_FAILURE;
-	}
-	return EXIT_SUCCESS;
-}
-
-int mf2044_pwm_deinit(MF2044_PWM_PINS pin)
-{
-	if (rt_dev_ioctl(fd, MF2044_IOCTL_OFF) == -1)
-	{
-		printf("TIOCMGET failed: %s\n", strerror(errno));
-		return EXIT_FAILURE;
-	}
 	return EXIT_SUCCESS;
 }
 
@@ -103,6 +81,7 @@ int mf2044_pwm_frequency_get(MF2044_PWM_PINS pin)
 
 int mf2044_pwm_frequency_set(MF2044_PWM_PINS pin, int freq)
 {
+	#warning TODO - we need to have some error messages fixing it in A-B
 	int command = MF2044_IOCTL_SET_FREQUENCY;
 	command |= pin;
 
@@ -113,3 +92,4 @@ int mf2044_pwm_frequency_set(MF2044_PWM_PINS pin, int freq)
 	}
 	return EXIT_SUCCESS;
 }
+

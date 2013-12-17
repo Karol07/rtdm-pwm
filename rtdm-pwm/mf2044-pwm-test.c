@@ -59,7 +59,6 @@ int main(int argc, char** argv)
 	}
 
 	mf2044_pwm_open();
-//	mf2044_pwm_init(pin);
 	mf2044_pwm_frequency_set(pin,freq);
 	mf2044_pwm_duty_cycle_set(pin,duty);
 
@@ -67,7 +66,6 @@ int main(int argc, char** argv)
 	unsigned int du = mf2044_pwm_duty_cycle_get(pin);
 	printf("freq %d\n", df);
 	printf("duty %d\n", du);
-//	mf2044_pwm_deinit(pin);
 //	mf2044_pwm_close();
 }
 

@@ -519,6 +519,7 @@ int __init simple_rtdm_init(void)
 	epwm2_0_map = ioremap(EPWM2_0_BASE,EPWM_SZ);
 	epwm2_1_map = ioremap(EPWM2_1_BASE,EPWM_SZ);
 
+	// enabling PWMSS clocks for eqep
 	iowrite32(0x2, cm_per_map+EPWMSS1_CLK_CTRL);
 	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
 	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);

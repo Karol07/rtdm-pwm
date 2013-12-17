@@ -30,7 +30,7 @@ uint64_t mf2044_enc_period_get(MF2044_ENC_PINS pin);
 int mf2044_enc_period_set(MF2044_ENC_PINS pin, uint64_t period);
 
 int32_t mf2044_enc_position_get(MF2044_ENC_PINS pin);
-void mf2044_enc_position_set(MF2044_ENC_PINS pin, int32_t position);
+int mf2044_enc_position_set(MF2044_ENC_PINS pin, int32_t position);
 
 double mf2044_enc_velocity_get(MF2044_ENC_PINS pin);
 

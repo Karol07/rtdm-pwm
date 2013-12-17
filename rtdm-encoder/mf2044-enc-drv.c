@@ -40,7 +40,6 @@ MODULE_AUTHOR("Seonghyun Kim");
 #define EPWMSS0_CLK_CTRL 0xd4
 #define EPWMSS2_CLK_CTRL 0xd8
 
-#pragma warning TODO - implement more pin handlers
 #define EQEP0_BASE 0x48300180
 #define EQEP1_BASE 0x48302180
 #define EQEP2_BASE 0x48304180
@@ -61,7 +60,8 @@ void __iomem *eqep1_map;
 void __iomem *eqep2_map;
 void __iomem *mmio_base;
 
-u64 clk_rate = SYSCLK;
+//Current hardware clock rate
+u64 clk_rate = -1;//SYSCLK;
 
 #define MF2044_IOCTL_MAGIC 0x00
 #define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
@@ -74,19 +74,19 @@ u64 clk_rate = SYSCLK;
 #define MF2044_IOCTL_SET_MODE _IO(MF2044_IOCTL_MAGIC, 8)
 
 // eQEP register offsets from its base IO address
-#define QPOSCNT    0x0000
+#define QPOSCNT    0x0000 // Position counter
 #define QPOSINIT   0x0004
 #define QPOSMAX    0x0008
 #define QPOSCMP    0x000C
 #define QPOSILAT   0x0010
 #define QPOSSLAT   0x0014
-#define QPOSLAT    0x0018
-#define QUTMR      0x001C
-#define QUPRD      0x0020    
+#define QPOSLAT    0x0018 // Position count latch
+#define QUTMR      0x001C // Unit timer
+#define QUPRD      0x0020 // Unit period register
 #define QWDTMR     0x0024
 #define QWDPRD     0x0026
 #define QDECCTL    0x0028
-#define QEPCTL     0x002A
+#define QEPCTL     0x002A // Control register
 #define QCAPCTL    0x002C
 #define QPOSCTL    0x002E
 #define QEINT      0x0030
@@ -177,16 +177,40 @@ u64 clk_rate = SYSCLK;
 #define TIEQEP_MODE_ABSOLUTE    0
 #define TIEQEP_MODE_RELATIVE    1
 
+// Structure defining the characteristics of the eQEP unit
+struct rt_eqep_chip
+{
+    // Platform device for this eQEP unit
+    struct platform_device *pdev;
+    
+    // Pointer to the base of the memory of the eQEP unit
+    void __iomem           *mmio_base;
+    
+    // SYSCLKOUT to the eQEP unit
+    u32                     clk_rate;
+    
+    // IRQ for the eQEP unit
+    u16                     irq;
+    
+    // Mode of the eQEP unit
+    u8                      mode;
+    
+    // work stuct for the notify userspace work
+    struct work_struct      notify_work;
+    
+    // Backup for driver suspension
+    u16                     prior_qepctl;
+    u16                     prior_qeint;
+};
+
 static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		rtdm_user_info_t *user_info, 
 		unsigned int request, void __user *arg)
 {
-	unsigned int res=0;
 	int32_t position = 0;
-	int rc;
 	u16 tmp;
 	u64 period;
-	struct clk       *clk;
+	u16 modeval = 0;
 	mmio_base = eqep1_map;
 
 	if (request & MF2044_ENC_0) {
@@ -205,8 +229,11 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		case MF2044_IOCTL_GET_POSITION:
 			if (mode == MF2044_MODE_ABSOLUTE) {
 				position = readl(mmio_base + QPOSCNT);
-			} else {
+			} else if (mode == MF2044_MODE_RELATIVE) {
 				position = readl(mmio_base + QPOSLAT);
+			} else {
+				rtdm_printk("You have set MODE properly. It should be Absolute or Relative.\n");
+				return -1;
 			}
 			*(int32_t*)arg = position;
 			break;
@@ -253,89 +280,105 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			break;
 		case MF2044_IOCTL_SET_MODE:
 			mode = (int)arg;
+			modeval = readw(mmio_base + QEPCTL);
+			if (MF2044_MODE_ABSOLUTE == mode) {
+				modeval = modeval & ~PCRM1 & ~PCRM0;
+			} else if (MF2044_MODE_RELATIVE == mode){
+				modeval = modeval | PCRM1 | PCRM0;
+			} else {
+				rtdm_printk("You have set MODE properly. It should be Absolute or Relative.\n");
+				return -1;
+			}
+			writew(modeval, mmio_base + QEPCTL);
 			break;
 
 	}
 
 	return 0;
 }
+
 /**
  * Open the device
  *
  * This function is called when the device shall be opened.
  *
  */
-static int simple_rtdm_open_nrt(struct rtdm_dev_context *context,
-				rtdm_user_info_t * user_info, int oflags)
+static int mf2044_rtdm_open_nrt(struct rtdm_dev_context *context,
+		rtdm_user_info_t * user_info, int oflags)
 {
-	struct resource  *r;
-	struct clk       *clk;
-	struct pinctrl   *pinctrl;
-	int               ret;
 	u64               period;
 	u16               status;
 	u32                value;
+	int i = 0;
+
+	for (i=0;i<3;i++) {
+		switch (i) {
+			case 0:
+				mmio_base = eqep0_map;
+				break;
+			case 1:
+				mmio_base = eqep1_map;
+				break;
+			case 2:
+				mmio_base = eqep2_map;
+				break;
+			default:
+				return -1;
+		}
+	
+		// Read decoder control settings
+		status = readw(mmio_base + QDECCTL);
+	
+		// Setting control register
+		value = 1;
+		status = ((value) ? status | QSRC0 : status & ~QSRC0) & ~QSRC1;
+		value = 0;
+		status = (value) ? status | QAP : status & ~QAP;
+		status = (value) ? status | QBP : status & ~QBP;
+		status = (value) ? status | QIP : status & ~QIP;
+		status = (value) ? status | QSP : status & ~QSP;
+		status = (value) ? status | SWAP : status & ~SWAP;
+	
+		writew(status, mmio_base + QDECCTL);
+	
+		// Initialize the position counter to zero
+		writel(0, mmio_base + QPOSINIT);
+	
+		// To prevent overflow problem by setting maximum value as -1. The eQEP subsystem has a register
+		// that defined the maximum value of the encoder as an unsigned.  If the counter is zero
+		// and decrements again, it is set to QPOSMAX.  If you cast -1 (signed int) to
+		// to an unsigned, you will notice that -1 == UINT_MAX.  So when the counter is set to this
+		// maximum position, when read into a signed int, it will equal -1.  Two's complement for 
+		// the WIN!!
+		writel(-1, mmio_base + QPOSMAX);
+	
+		// Enable some interrupts
+		status = readw(mmio_base + QEINT);
+		status = status | UTOF; 
+		// UTOF - Unit Time Period interrupt.  This is triggered when the unit timer period expires
+	
+		writew(status, mmio_base + QEINT);
+	
+		// Calculate the timer ticks per second
+		period = 1000000000;
+		period = period * clk_rate;
+		do_div(period, NSEC_PER_SEC);
+	
+		// Set this period into the unit timer period register
+		writel(period & 0x00000000FFFFFFFF, mmio_base + QUPRD);
+	
+		// Enable the eQEP with basic position counting turned on
+		status = readw(mmio_base + QEPCTL);
+		status = status | PHEN | IEL0 | SWI | UTE | QCLM;
+		// PHEN - Quadrature position counter enable bit
+		// IEL0 - Latch QPOSILAT on index signal.  This can be rising or falling, IEL[1:0] = 0 is reserved
+		// SWI  - Software initialization of position count register.  Basic set QPOSCNT <= QPOSINIT
+		// UTE  - unit timer enable
+		// QCLM - latch QPOSLAT to QPOSCNT upon unit timer overflow
+		writew(status, mmio_base + QEPCTL);
+	}
 
 	rtdm_printk("PWM driver open without errors!\n");
-	mmio_base = eqep1_map;
-
-	// Read decoder control settings
-	status = readw(mmio_base + QDECCTL);
-
-	value = 1;
-	status = ((value) ? status | QSRC0 : status & ~QSRC0) & ~QSRC1;
-	value = 0;
-        status = (value) ? status | QAP : status & ~QAP;
-        status = (value) ? status | QBP : status & ~QBP;
-	status = (value) ? status | QIP : status & ~QIP;
-	status = (value) ? status | QSP : status & ~QSP;
-	status = (value) ? status | SWAP : status & ~SWAP;
-
-	writew(status, mmio_base + QDECCTL);
-
-	// Initialize the position counter to zero
-	writel(0, mmio_base + QPOSINIT);
-
-	// This is pretty ingenious if I do say so myself.  The eQEP subsystem has a register
-	// that defined the maximum value of the encoder as an unsigned.  If the counter is zero
-	// and decrements again, it is set to QPOSMAX.  If you cast -1 (signed int) to
-	// to an unsigned, you will notice that -1 == UINT_MAX.  So when the counter is set to this
-	// maximum position, when read into a signed int, it will equal -1.  Two's complement for 
-	// the WIN!!
-	writel(-1, mmio_base + QPOSMAX);
-
-	// Enable some interrupts
-	status = readw(mmio_base + QEINT);
-	status = status | UTOF;
-	// UTOF - Unit Time Period interrupt.  This is triggered when the unit timer period expires
-	// 
-	writew(status, mmio_base + QEINT);
-
-	// Calculate the timer ticks per second
-	period = 1000000000;
-	period = period * clk_rate;
-	do_div(period, NSEC_PER_SEC);
-
-	// Set this period into the unit timer period register
-	writel(period & 0x00000000FFFFFFFF, mmio_base + QUPRD);
-
-	// Enable the eQEP with basic position counting turned on
-	status = readw(mmio_base + QEPCTL);
-	status = status | PHEN | IEL0 | SWI | UTE | QCLM;
-	// PHEN - Quadrature position counter enable bit
-	// IEL0 - Latch QPOSILAT on index signal.  This can be rising or falling, IEL[1:0] = 0 is reserved
-	// SWI  - Software initialization of position count register.  Basic set QPOSCNT <= QPOSINIT
-	// UTE  - unit timer enable
-	// QCLM - latch QPOSLAT to QPOSCNT upon unit timer overflow
-	writew(status, mmio_base + QEPCTL);
-
-//    status = pwmss_submodule_state_change(pdev->dev.parent, PWMSS_EQEPCLK_EN);
-//    // If we failed to enable the clocks, fail out
-//    if (!(status & PWMSS_EQEPCLK_EN_ACK)) 
-//    {
-//        dev_err(&pdev->dev, "PWMSS config space clock enable failed\n");
-//        ret = -EINVAL;
-//    }
 
 	return 0;
 }
@@ -362,7 +405,7 @@ static struct rtdm_device device = {
 	.device_flags = RTDM_NAMED_DEVICE | RTDM_EXCLUSIVE,
 	.device_name = DEVICE_NAME,
 
-	.open_nrt = simple_rtdm_open_nrt,
+	.open_nrt = mf2044_rtdm_open_nrt,
 
 	.ops = {
 		.close_nrt = mf2044_rtdm_close_nrt,
@@ -383,20 +426,27 @@ static struct rtdm_device device = {
 /**
  * This function is called when the module is loaded
  *
- * It simply registers the RTDM device.
+ * It registers the RTDM device.
  *
  */
-int __init simple_rtdm_init(void)
+static int __init rt_enc_init(void)
 {
 	int res = -1;
-	int request_command =0;
-	int request_value =0;
-	struct clk       *clk;
-
 	res = rtdm_dev_register(&device);
 
 	if (0 == res) {
 		rtdm_printk("PWM driver registered without errors!\n");
+		cm_per_map = ioremap(CM_PER_BASE,CM_PER_SZ);
+		eqep0_map = ioremap(EQEP0_BASE,EQEP_SZ);
+		eqep1_map = ioremap(EQEP1_BASE,EQEP_SZ);
+		eqep2_map = ioremap(EQEP2_BASE,EQEP_SZ);
+
+		// enabling PWMSS clocks for eqep
+		iowrite32(0x2, cm_per_map+EPWMSS1_CLK_CTRL);
+		iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
+		iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
+
+		clk_rate = SYSCLK;
 	} else {
 		rtdm_printk("PWM driver registration failed: \n");
 		switch(res) {
@@ -419,19 +469,6 @@ int __init simple_rtdm_init(void)
 		}
 		rtdm_printk("\n");
 	}
-
-	cm_per_map = ioremap(CM_PER_BASE,CM_PER_SZ);
-	eqep0_map = ioremap(EQEP0_BASE,EQEP_SZ);
-	eqep1_map = ioremap(EQEP1_BASE,EQEP_SZ);
-	eqep2_map = ioremap(EQEP2_BASE,EQEP_SZ);
-
-	iowrite32(0x2, cm_per_map+EPWMSS1_CLK_CTRL);
-	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
-	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
-
-	clk_rate = SYSCLK;
-//	rtdm_printk("clk_rate [%llu]\n", (u64)clk_rate);
-
 	return res;
 }
 
@@ -441,11 +478,11 @@ int __init simple_rtdm_init(void)
  * It unregister the RTDM device, polling at 1000 ms for pending users.
  *
  */
-void __exit simple_rtdm_exit(void)
+static void __exit rt_enc_exit(void)
 {
-
 	rtdm_dev_unregister(&device, 1000);
 }
 
-module_init(simple_rtdm_init);
-module_exit(simple_rtdm_exit);
+module_init(rt_enc_init);
+module_exit(rt_enc_exit);
+

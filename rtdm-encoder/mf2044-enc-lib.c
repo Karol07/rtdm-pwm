@@ -9,8 +9,9 @@
 #include <rtdm/rtdm.h>
 #include "mf2044-enc-lib.h"
 #include <time.h>
+#include <math.h>
 
-#define DEVICE_NAME		"mf2044_enc_drv"
+#define DEVICE_NAME "mf2044_enc_drv"
 #define MF2044_IOCTL_MAGIC 0x00
 #define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
 #define MF2044_IOCTL_OFF _IO(MF2044_IOCTL_MAGIC, 2)
@@ -20,6 +21,9 @@
 #define MF2044_IOCTL_SET_PERIOD _IO(MF2044_IOCTL_MAGIC, 6)
 #define MF2044_IOCTL_GET_MODE _IO(MF2044_IOCTL_MAGIC, 7)
 #define MF2044_IOCTL_SET_MODE _IO(MF2044_IOCTL_MAGIC, 8)
+
+#define SEC_PER_NSEC 1e-9
+#define NSEC_PER_SEC 1000000000
 
 static int fd = -1;
 
@@ -101,7 +105,7 @@ int32_t mf2044_enc_position_get(MF2044_ENC_PINS pin)
 	return det;
 }
 
-void mf2044_enc_position_set(MF2044_ENC_PINS pin, int32_t position)
+int mf2044_enc_position_set(MF2044_ENC_PINS pin, int32_t position)
 {
 	int command = MF2044_IOCTL_SET_POSITION;
 	command |= pin;
@@ -121,27 +125,23 @@ double mf2044_enc_velocity_get(MF2044_ENC_PINS pin)
 	uint64_t period = mf2044_enc_period_get(pin);
 	struct timespec ts;
 	MF2044_ENC_MODES mode = mf2044_enc_mode_get(pin);
-	ts.tv_sec = 0;
-	ts.tv_nsec = period;
-
 	switch(mode)
 	{
 		case MF2044_ENC_MODE_RELATIVE:
 			position = mf2044_enc_position_get(pin);
-//			printf("position [%d]\n", position);
 			break;
 		case MF2044_ENC_MODE_ABSOLUTE:
+			ts.tv_sec = period / NSEC_PER_SEC;
+			ts.tv_nsec = period % NSEC_PER_SEC;
 			position = mf2044_enc_position_get(pin);
-//			printf("position1 [%d]\n", position);
 			nanosleep(&ts,NULL);
+			#warning TODO - I need to consider overflow. Even though QPOSMAX considers.
 			position = position - mf2044_enc_position_get(pin);
-//			printf("position delta [%d]\n", position);
 			break;
 		default:
 			return (float) EXIT_FAILURE;
 	}
-//	printf("period [%f]\n", (period * 1e-9) );
-	ret = position / (period * 1e-9);
-	return ret;
+	ret = position / (period * SEC_PER_NSEC);
+	return fabs(ret);
 }
 
