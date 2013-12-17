@@ -8,7 +8,6 @@
  *  - read:  return previously stored data and erase buffer
  *
  */
-
 #include <rtdm/rtdm_driver.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -57,9 +56,6 @@ void __iomem *epwm2_1_map;
 
 #define TBCNT 0x8
 #define CMPAHR 0x10
-//#define TBPRD 0xa
-//#define CMPA 0x12
-
 
 /* EHRPWM registers and bits definitions */
 /* Time base module registers */
@@ -191,7 +187,6 @@ static int set_prescale_div(unsigned long rqst_prescaler,
 
 	for (clkdiv = 0; clkdiv <= CLKDIV_MAX; clkdiv++) {
 		for (hspclkdiv = 0; hspclkdiv <= HSPCLKDIV_MAX; hspclkdiv++) {
-
 			/*
 			 * calculations for prescaler value :
 			 * prescale_div = HSPCLKDIVIDER * CLKDIVIDER.
@@ -202,7 +197,6 @@ static int set_prescale_div(unsigned long rqst_prescaler,
 			 * Configure prescale_div value such that period
 			 * register value is less than 65535.
 			 */
-
 			*prescale_div = (1 << clkdiv) *
 					(hspclkdiv ? (hspclkdiv * 2) : 1);
 			if (*prescale_div > rqst_prescaler) {
@@ -450,10 +444,13 @@ static struct rtdm_device device = {
 /**
  * This function is called when the module is loaded
  *
- * It simply registers the RTDM device.
+ * It registers the RTDM device.
+ * parameters:
+ * pin : same as defines. i.e.) P9.14 = 1<<4
+ * freq : nanoseconds.
+ * duty cycle : nanoseconds, not percent.
  *
  */
-
 int __init simple_rtdm_init(void)
 {
 	int res = -1;
@@ -468,16 +465,9 @@ int __init simple_rtdm_init(void)
 	int freq_ = (int) pm_init[1];
 	int duty_ = (int) pm_init[2];
 
-	rtdm_printk("pin %d\n", pin_);
-	rtdm_printk("freq %d\n", freq_);
-	rtdm_printk("duty %d\n", duty_);
+	period_cycles = freq_;
+	duty_cycles = duty_;
 
-	period_cycles = freq_ * FREQ_CONS;
-//	d = period_cycles * d;
-	duty_cycles = period_cycles * 100;
-	do_div(duty_cycles,duty_);
-
-//	duty_cycles   = period_cycles / (int)(100/duty_);
 	rtdm_printk( "1.Period cycles : %lu\n",period_cycles);
 	rtdm_printk( "2.Duty cycles : %lu\n",duty_cycles);
 
@@ -526,8 +516,6 @@ int __init simple_rtdm_init(void)
 	/* Changes to shadow mode */
 	ehrpwm_modify(epwm1_0_map, AQSFRC, AQSFRC_RLDCSF_MASK,
 			AQSFRC_RLDCSF_ZRO);
-//	aqcsfrc_val = AQCSFRC_CSFA_FRCDIS;
-//	aqcsfrc_mask = AQCSFRC_CSFA_MASK;
 	aqcsfrc_val = AQCSFRC_CSFB_FRCDIS;
 	aqcsfrc_mask = AQCSFRC_CSFB_MASK;
 
@@ -555,6 +543,7 @@ int __init simple_rtdm_init(void)
 
 	/* Update clock prescaler values */
 	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_CLKDIV_MASK, tb_divval);
+
 	/* Update period & duty cycle with presacler division */
 	period_cycles = period_cycles / ps_divval;
 	duty_cycles = duty_cycles / ps_divval;

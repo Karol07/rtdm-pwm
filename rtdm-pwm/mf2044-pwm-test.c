@@ -66,6 +66,5 @@ int main(int argc, char** argv)
 	unsigned int du = mf2044_pwm_duty_cycle_get(pin);
 	printf("freq %d\n", df);
 	printf("duty %d\n", du);
-//	mf2044_pwm_close();
 }
 
