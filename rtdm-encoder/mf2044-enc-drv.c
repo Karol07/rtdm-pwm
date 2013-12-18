@@ -286,7 +286,7 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 			} else if (MF2044_MODE_RELATIVE == mode){
 				modeval = modeval | PCRM1 | PCRM0;
 			} else {
-				rtdm_printk("You have set MODE properly. It should be Absolute or Relative.\n");
+				rtdm_printk("mode should be Absolute or Relative.\n");
 				return -1;
 			}
 			writew(modeval, mmio_base + QEPCTL);

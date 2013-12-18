@@ -7,11 +7,10 @@
 
 int main(int argc, char** argv)
 {
-	// P8_19
 	int param_opt;
 	MF2044_PWM_PINS pin=1;
-	int freq = 100;
-	int duty = 75;
+	int freq = -1;
+	int duty = -1;
 	opterr = 0;
 	while (-1 != (param_opt = getopt(argc, argv, "f:od:op:o")))
 	{
@@ -30,9 +29,6 @@ int main(int argc, char** argv)
 				assert(0);
 		}
 	}
-	printf("pin : %d\n", pin);
-	printf("freq : %d\n", freq);
-	printf("duty : %d\n", duty);
 
 	switch(pin)
 	{
@@ -48,23 +44,28 @@ int main(int argc, char** argv)
 		case 4:
 			pin = MF2044_PWM_P9_22;
 			break;
-		case 5:
-			pin = MF2044_PWM_P8_13;
+		case 5: 
+			pin = MF2044_PWM_P8_19;
 			break;
 		case 6:
-			pin = MF2044_PWM_P8_19;
+			pin = MF2044_PWM_P8_13;
 			break;
 		default:
 			assert(0);
 	}
 
 	mf2044_pwm_open();
-	mf2044_pwm_frequency_set(pin,freq);
-	mf2044_pwm_duty_cycle_set(pin,duty);
-
+	if (-1 != freq) {
+		mf2044_pwm_frequency_set(pin,freq);
+	}
+	if (-1 != duty) {
+		mf2044_pwm_duty_cycle_set(pin,duty);
+	}
 	unsigned int df = mf2044_pwm_frequency_get(pin);
 	unsigned int du = mf2044_pwm_duty_cycle_get(pin);
 	printf("freq %d\n", df);
 	printf("duty %d\n", du);
+
+	while(1) {}
 }
 

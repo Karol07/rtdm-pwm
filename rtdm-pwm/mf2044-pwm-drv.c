@@ -28,7 +28,6 @@ MODULE_AUTHOR("Seonghyun Kim");
 #define SOME_SUB_CLASS		4711
 
 #define SYSCLK 100000000
-#define FREQ_CONS 100000
 
 void __iomem *cm_per_map;
 void __iomem *epwm1_0_map;
@@ -44,7 +43,6 @@ void __iomem *epwm2_1_map;
 #define EPWMSS0_CLK_CTRL 0xd4
 #define EPWMSS2_CLK_CTRL 0xd8
 
-#pragma warning TODO - implement more pin handlers
 #define EPWM1_0_BASE 0x48302200
 #define EPWM1_1_BASE 0x48302260
 #define EPWM0_0_BASE 0x48300200
@@ -139,12 +137,12 @@ void __iomem *epwm2_1_map;
 
 #define NUM_PWM_CHANNEL		2	/* EHRPWM channels */
 
-#define MF2044_PWM_1_0 1 << 4 //P9.14
-#define MF2044_PWM_1_1 1 << 5 //P9.16
-#define MF2044_PWM_0_0 1 << 6 //P9.22
-#define MF2044_PWM_0_1 1 << 7 //P9.21
-#define MF2044_PWM_2_0 1 << 8 //P8.19
-#define MF2044_PWM_2_1 1 << 9 //P8.13
+#define MF2044_PWM_1_0 (1<<4) //P9.14
+#define MF2044_PWM_1_1 (1<<5) //P9.16
+#define MF2044_PWM_0_0 (1<<6) //P9.22
+#define MF2044_PWM_0_1 (1<<7) //P9.21
+#define MF2044_PWM_2_0 (1<<8) //P8.19
+#define MF2044_PWM_2_1 (1<<9) //P8.13
 
 #define MF2044_IOCTL_MAGIC 0x00
 #define MF2044_IOCTL_ON _IO(MF2044_IOCTL_MAGIC, 1)
@@ -154,9 +152,12 @@ void __iomem *epwm2_1_map;
 #define MF2044_IOCTL_GET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 5)
 #define MF2044_IOCTL_SET_FREQUENCY _IO(MF2044_IOCTL_MAGIC, 6)
 
-int pm_init[4]={1,100,100,1};
-int frequencies[6]={0,0,0,0,0,0};
-int dutycycles[6]={100,100,100,100,100,100};
+#define FREQ_INIT 0
+#define DUTY_INIT 0
+
+int pm_init[4]={1,FREQ_INIT,DUTY_INIT,1};
+int frequencies[6]={FREQ_INIT,FREQ_INIT,FREQ_INIT,FREQ_INIT,FREQ_INIT,FREQ_INIT};
+int dutycycles[6]={DUTY_INIT,DUTY_INIT,DUTY_INIT,DUTY_INIT,DUTY_INIT,DUTY_INIT};
 
 compat_module_param_array(pm_init,int,NULL,0);
 
@@ -258,16 +259,13 @@ static int _set_freq_duty(void __iomem *target,
 	unsigned long long c;
 	unsigned long period_cycles, duty_cycles;
 
-//	period_cycles = freq_ * freq_cons;
-//	duty_cycles   = period_cycles / (int)(100/duty_);
-
 	period_cycles = freq_;
 	duty_cycles   = duty_;
 
-	rtdm_printk( "1.Period cycles : %lu\n",period_cycles);
-	rtdm_printk( "2.Duty cycles : %lu\n",duty_cycles);
+//	rtdm_printk( "1.Period cycles : %lu\n",period_cycles);
+//	rtdm_printk( "2.Duty cycles : %lu\n",duty_cycles);
 
-	ehrpwm_modify(epwm1_0_map, AQSFRC, AQSFRC_RLDCSF_MASK,
+	ehrpwm_modify(target, AQSFRC, AQSFRC_RLDCSF_MASK,
 			AQSFRC_RLDCSF_ZRO);
 	if (1 == isA) {
 		aqcsfrc_val = AQCSFRC_CSFA_FRCDIS;
@@ -277,10 +275,10 @@ static int _set_freq_duty(void __iomem *target,
 		aqcsfrc_mask = AQCSFRC_CSFB_MASK;
 	}
 
-	ehrpwm_modify(epwm1_0_map, AQCSFRC, aqcsfrc_mask, aqcsfrc_val);
+	ehrpwm_modify(target, AQCSFRC, aqcsfrc_mask, aqcsfrc_val);
 
 	/* Enable time counter for free_run */
-	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_RUN_MASK, TBCTL_FREE_RUN);
+	ehrpwm_modify(target, TBCTL, TBCTL_RUN_MASK, TBCTL_FREE_RUN);
 
 	c = SYSCLK;
 	c = (c * period_cycles);
@@ -300,23 +298,26 @@ static int _set_freq_duty(void __iomem *target,
 	}
 
 	/* Update clock prescaler values */
-	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_CLKDIV_MASK, tb_divval);
+	ehrpwm_modify(target, TBCTL, TBCTL_CLKDIV_MASK, tb_divval);
 	/* Update period & duty cycle with presacler division */
 	period_cycles = period_cycles / ps_divval;
 	duty_cycles = duty_cycles / ps_divval;
 
+//	rtdm_printk( "after 1.Period cycles : %lu\n",period_cycles);
+//	rtdm_printk( "after 2.Duty cycles : %lu\n",duty_cycles);
+
 	/* Configure shadow loading on Period register */
-	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_PRDLD_MASK, TBCTL_PRDLD_SHDW);
-	ehrpwm_write(epwm1_0_map, TBPRD, period_cycles);
+	ehrpwm_modify(target, TBCTL, TBCTL_PRDLD_MASK, TBCTL_PRDLD_SHDW);
+	ehrpwm_write(target, TBPRD, period_cycles);
 
 	/* Configure ehrpwm counter for up-count mode */
-	ehrpwm_modify(epwm1_0_map, TBCTL, TBCTL_CTRMODE_MASK,
+	ehrpwm_modify(target, TBCTL, TBCTL_CTRMODE_MASK,
 			TBCTL_CTRMODE_UP);
 
 	if (1 == isA) {
-		ehrpwm_write(epwm1_0_map, CMPA, duty_cycles);
+		ehrpwm_write(target, CMPA, duty_cycles);
 	} else {
-		ehrpwm_write(epwm1_0_map, CMPB, duty_cycles);
+		ehrpwm_write(target, CMPB, duty_cycles);
 	}
 
 	return 0;
@@ -339,74 +340,83 @@ static int mf2044_rtdm_ioctl_nrt(struct rtdm_dev_context *context,
 		target = epwm1_0_map;
 		request &= ~(MF2044_PWM_1_0);
 		pindex = 0;
+		freq_ = frequencies[pindex];
+		duty_ = dutycycles[pindex];
+
 		isA = 1;
 	} else if (request & MF2044_PWM_1_1) {
 		rtdm_printk("P9.16\n");
 		target = epwm1_1_map;
 		request &= ~(MF2044_PWM_1_1);
 		pindex = 1;
+		freq_ = frequencies[pindex-1];
+		duty_ = dutycycles[pindex];
 		isA = 0;
 	} else if (request & MF2044_PWM_0_0) {
 		rtdm_printk("P9.22\n");
 		target = epwm0_0_map;
 		request &= ~(MF2044_PWM_0_0);
 		pindex = 2;
+		freq_ = frequencies[pindex];
+		duty_ = dutycycles[pindex];
 		isA = 1;
 	} else if (request & MF2044_PWM_0_1) {
 		rtdm_printk("P9.21\n");
 		target = epwm0_1_map;
 		request &= ~(MF2044_PWM_0_1);
 		pindex = 3;
+		freq_ = frequencies[pindex-1];
+		duty_ = dutycycles[pindex];
+
 		isA = 0;
 	} else if (request & MF2044_PWM_2_0) {
 		rtdm_printk("P8.19\n");
 		target = epwm2_0_map;
 		request &= ~(MF2044_PWM_2_0);
 		pindex = 4;
+		freq_ = frequencies[pindex];
+		duty_ = dutycycles[pindex];
 		isA = 1;
 	} else if (request & MF2044_PWM_2_1) {
 		rtdm_printk("P8.13\n");
 		target = epwm2_1_map;
 		request &= ~(MF2044_PWM_2_1);
 		pindex = 5;
+		freq_ = frequencies[pindex-1];
+		duty_ = dutycycles[pindex];
 		isA = 0;
 	}
-
-	freq_ = frequencies[pindex];
-	duty_ = dutycycles[pindex];
 
 	switch(request)
 	{
 		case MF2044_IOCTL_ON:
-			rtdm_printk("MF2044_IOCTL_ON\n");
+//			rtdm_printk("MF2044_IOCTL_ON\n");
 			break;
 		case MF2044_IOCTL_OFF:
-			rtdm_printk("MF2044_IOCTL_OFF\n");
+//			rtdm_printk("MF2044_IOCTL_OFF\n");
 			break;
 		case MF2044_IOCTL_GET_DUTY_CYCLE:
-			rtdm_printk("MF2044_IOCTL_GET D\n");
+//			rtdm_printk("MF2044_IOCTL_GET D\n");
 			*(int*)arg = dutycycles[pindex];
 			return 0;
-			break;
 		case MF2044_IOCTL_SET_DUTY_CYCLE:
-			rtdm_printk("MF2044_IOCTL_SET D\n");
+//			rtdm_printk("MF2044_IOCTL_SET D\n");
 			duty_ = (int)arg;
 			dutycycles[pindex]=duty_;
 			break;
 		case MF2044_IOCTL_GET_FREQUENCY:
-			rtdm_printk("MF2044_IOCTL_GET F\n");
+//			rtdm_printk("MF2044_IOCTL_GET F\n");
 			*(int*)arg = frequencies[pindex];
 			return 0;
-			break;
 		case MF2044_IOCTL_SET_FREQUENCY:
-			rtdm_printk("MF2044_IOCTL_SET F\n");
+//			rtdm_printk("MF2044_IOCTL_SET F\n");
 			freq_ = (int)arg;
 			frequencies[pindex]=freq_;
 			break;
 	}
 
-	rtdm_printk( "ioctl Period cycles : %d\n",(int)freq_);
-	rtdm_printk( "ioctl Duty cycles : %d\n",(int)duty_);
+//	rtdm_printk( "ioctl Period cycles : %d\n",(int)freq_);
+//	rtdm_printk( "ioctl Duty cycles : %d\n",(int)duty_);
 
 	_set_freq_duty(target,(int)freq_,(int)duty_,isA);
 
@@ -465,8 +475,8 @@ int __init simple_rtdm_init(void)
 	period_cycles = freq_;
 	duty_cycles = duty_;
 
-	rtdm_printk( "1.Period cycles : %lu\n",period_cycles);
-	rtdm_printk( "2.Duty cycles : %lu\n",duty_cycles);
+	rtdm_printk( "before 1.Period cycles : %lu\n",period_cycles);
+	rtdm_printk( "before 2.Duty cycles : %lu\n",duty_cycles);
 
 	res = rtdm_dev_register(&device);
 
@@ -507,7 +517,9 @@ int __init simple_rtdm_init(void)
 	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
 	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
 
-	_set_freq_duty(epwm1_0_map, period_cycles, duty_cycles, isA);
+	if (freq_ != duty_) {
+		_set_freq_duty(epwm1_0_map, period_cycles, duty_cycles, isA);
+	}
 
 	return res;
 }
@@ -523,6 +535,9 @@ void __exit simple_rtdm_exit(void)
 	iowrite32(0x0, cm_per_map+EPWMSS1_CLK_CTRL);
 	iowrite32(0x0, cm_per_map+EPWMSS0_CLK_CTRL);
 	iowrite32(0x0, cm_per_map+EPWMSS2_CLK_CTRL);
+
+	memset(frequencies, FREQ_INIT, sizeof(frequencies));
+	memset(dutycycles, DUTY_INIT, sizeof(dutycycles));
 
 	rtdm_dev_unregister(&device, 1000);
 }
