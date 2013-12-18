@@ -39,10 +39,10 @@ int main(int argc, char** argv)
 			pin = MF2044_PWM_P9_16;
 			break;
 		case 3:
-			pin = MF2044_PWM_P9_21;
+			pin = MF2044_PWM_P9_22;
 			break;
 		case 4:
-			pin = MF2044_PWM_P9_22;
+			pin = MF2044_PWM_P9_21;
 			break;
 		case 5: 
 			pin = MF2044_PWM_P8_19;
@@ -66,6 +66,5 @@ int main(int argc, char** argv)
 	printf("freq %d\n", df);
 	printf("duty %d\n", du);
 
-	while(1) {}
 }
 
