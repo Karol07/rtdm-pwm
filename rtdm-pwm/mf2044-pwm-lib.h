@@ -16,11 +16,19 @@ typedef enum {
 	MF2044_PWM_PMAX,
 } MF2044_PWM_PINS;
 
+// Open driver
 int mf2044_pwm_open(void);
+// Close driver
 int mf2044_pwm_close(void);
-int mf2044_pwm_duty_cycle_set(MF2044_PWM_PINS pin, int duty);
-int mf2044_pwm_freqency_set(MF2044_PWM_PINS pin, int freq);
+
+// Get the ducy cycle of the eHRPWM hardware (percent 0-100)
 int mf2044_pwm_duty_cycle_get(MF2044_PWM_PINS pin);
+// Set the ducy cycle of the eHRPWM hardware (percent 0-100)
+int mf2044_pwm_duty_cycle_set(MF2044_PWM_PINS pin, int duty);
+
+// Get the frequency of the eHRPWM hardware (nanosecond)
+int mf2044_pwm_freqency_set(MF2044_PWM_PINS pin, int freq);
+// Set the frequency of the eHRPWM hardware (nanosecond)
 int mf2044_pwm_frequency_get(MF2044_PWM_PINS pin);
 
 #ifdef __cplusplus

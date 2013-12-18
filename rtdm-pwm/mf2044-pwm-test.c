@@ -16,17 +16,18 @@ int main(int argc, char** argv)
 	{
 		switch (param_opt)
 		{
-			case 'p':
+			case 'p': // pin
 				pin = atoi(optarg);
 				break;
-			case 'f':
+			case 'f': // frequency
 				freq = atoi(optarg);
 				break;
-			case 'd':
+			case 'd': // duty cycle
 				duty = atoi(optarg);
 				break;
 			default:
-				assert(0);
+				fprintf(stderr,"usage: mf2044-pwm-test [-p <pinnum>] [-f <frequency ns>] [-d <ducy percent>]\n");
+				return -1;
 		}
 	}
 
@@ -51,20 +52,24 @@ int main(int argc, char** argv)
 			pin = MF2044_PWM_P8_13;
 			break;
 		default:
-			assert(0);
+			fprintf(stderr,"pinnum should be from 1 to 6.\n");
+			return -1;
 	}
 
 	mf2044_pwm_open();
+
 	if (-1 != freq) {
 		mf2044_pwm_frequency_set(pin,freq);
 	}
 	if (-1 != duty) {
 		mf2044_pwm_duty_cycle_set(pin,duty);
 	}
-	unsigned int df = mf2044_pwm_frequency_get(pin);
-	unsigned int du = mf2044_pwm_duty_cycle_get(pin);
-	printf("freq %d\n", df);
-	printf("duty %d\n", du);
+	freq = mf2044_pwm_frequency_get(pin);
+	duty = mf2044_pwm_duty_cycle_get(pin);
 
+	printf("current frequency %d (nanosecond)\n", freq);
+	printf("current duty %d (percent)\n", duty);
+
+	return 0;
 }
 

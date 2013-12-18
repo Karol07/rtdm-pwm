@@ -36,6 +36,7 @@ void __iomem *epwm0_0_map;
 void __iomem *epwm0_1_map;
 void __iomem *epwm2_0_map;
 void __iomem *epwm2_1_map;
+void __iomem *mmio_base;
 
 #define CM_PER_BASE 0x44e00000
 #define CM_PER_SZ 0x44e03fff-CM_PER_BASE
@@ -462,21 +463,18 @@ static struct rtdm_device device = {
  * duty cycle : nanoseconds, not percent.
  * isA : a=1, b=0
  */
-int __init simple_rtdm_init(void)
+int __init rt_pwm_init(void)
 {
 	int res = -1;
 	unsigned long period_cycles, duty_cycles;
 
-	int pin = (int) pm_init[0];
+	int pin_ = (int) pm_init[0];
 	int freq_ = (int) pm_init[1];
 	int duty_ = (int) pm_init[2];
 	int isA = (int) pm_init[3];
 
 	period_cycles = freq_;
 	duty_cycles = duty_;
-
-	rtdm_printk( "before 1.Period cycles : %lu\n",period_cycles);
-	rtdm_printk( "before 2.Duty cycles : %lu\n",duty_cycles);
 
 	res = rtdm_dev_register(&device);
 
@@ -517,8 +515,30 @@ int __init simple_rtdm_init(void)
 	iowrite32(0x2, cm_per_map+EPWMSS0_CLK_CTRL);
 	iowrite32(0x2, cm_per_map+EPWMSS2_CLK_CTRL);
 
+	switch(pin_) {
+		case 1:
+			mmio_base = epwm1_0_map;
+			break;
+		case 2:
+			mmio_base = epwm1_1_map;
+			break;
+		case 3:
+			mmio_base = epwm0_0_map;
+			break;
+		case 4:
+			mmio_base = epwm0_1_map;
+			break;
+		case 5:
+			mmio_base = epwm2_0_map;
+			break;
+		case 6:
+			mmio_base = epwm2_1_map;
+			break;
+		default:
+			break;
+	}
 	if (freq_ != duty_) {
-		_set_freq_duty(epwm1_0_map, period_cycles, duty_cycles, isA);
+		_set_freq_duty(mmio_base, period_cycles, duty_cycles, isA);
 	}
 
 	return res;
@@ -530,7 +550,7 @@ int __init simple_rtdm_init(void)
  * It unregister the RTDM device, polling at 1000 ms for pending users.
  *
  */
-void __exit simple_rtdm_exit(void)
+void __exit rt_pwm_exit(void)
 {
 	iowrite32(0x0, cm_per_map+EPWMSS1_CLK_CTRL);
 	iowrite32(0x0, cm_per_map+EPWMSS0_CLK_CTRL);
@@ -542,5 +562,5 @@ void __exit simple_rtdm_exit(void)
 	rtdm_dev_unregister(&device, 1000);
 }
 
-module_init(simple_rtdm_init);
-module_exit(simple_rtdm_exit);
+module_init(rt_pwm_init);
+module_exit(rt_pwm_exit);
